@@ -22,6 +22,7 @@ export function Navbar() {
   const navigationItems = [
     { label: 'Inicio', href: '/' },
     { label: 'Dashboard', href: '/dashboard' },
+    { label: 'Grupos', href: '/groups' },
     { label: 'Recursos', href: '/resources' },
   ];
 

@@ -6,6 +6,7 @@ import { RegisterPage } from './components/RegisterPage';
 import { Dashboard } from './components/Dashboard';
 import { GroupDashboard } from './components/GroupDashboard';
 import { CreateGroup } from './components/CreateGroup';
+import { Groups } from './components/Groups';
 import { Profile } from './components/Profile';
 import { Resources } from './components/Resources';
 import { Navbar } from './components/Navbar';
@@ -21,6 +22,7 @@ export default function App() {
           <Route path="/register" element={<RegisterPage />} />
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/create-group" element={<CreateGroup />} />
+          <Route path="/groups" element={<Groups />} />
           <Route path="/group/:groupId" element={<GroupDashboard />} />
           <Route path="/profile" element={<Profile />} />
           <Route path="/resources" element={<Resources />} />
