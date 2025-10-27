@@ -8,6 +8,8 @@ import { Checkbox } from './ui/checkbox';
 import { Alert, AlertDescription } from './ui/alert';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { User, Mail, Lock, Eye, EyeOff, Phone } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext'; // <--- Integrado
+import { toast } from 'sonner@2.0.3'; // <--- Integrado
 
 export function RegisterPage() {
   const [formData, setFormData] = useState({
@@ -24,6 +26,7 @@ export function RegisterPage() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [error, setError] = useState('');
   const navigate = useNavigate();
+  const { login } = useAuth(); // <--- Integrado
 
   const handleInputChange = (field: string, value: string | boolean) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -33,7 +36,7 @@ export function RegisterPage() {
     e.preventDefault();
     setError('');
 
-    // Validation (esto ya lo tienes y está bien)
+    // Validation
     if (!formData.firstName || !formData.lastName || !formData.email || !formData.password) {
       setError('Por favor completa todos los campos obligatorios');
       return;
@@ -51,29 +54,29 @@ export function RegisterPage() {
       return;
     }
 
-    // === INICIO DE LA CORRECCIÓN ===
     try {
+      // 1. Llama al backend real (de tu primer código)
       const response = await fetch('/api/auth/register', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        // Enviamos el objeto JSON que tu backend espera
         body: JSON.stringify({
           firstName: formData.firstName,
           lastName: formData.lastName,
           email: formData.email,
           phone: formData.phone,
-          riskProfile: formData.riskProfile || 'moderate', // Enviar un valor por defecto si está vacío
-          // Tu backend espera 'passwordHash', le pasamos la contraseña
+          riskProfile: formData.riskProfile || 'moderate',
           passwordHash: formData.password,
         }),
       });
 
       if (response.ok) {
-        // Registro exitoso
-        alert('¡Registro exitoso! Verifica tu email para activar tu cuenta.');
-        navigate('/login');
+        // 2. Si el registro es exitoso, auto-login y notifica (de tu segundo código)
+        login(formData.email, formData.password);
+        toast.success('¡Registro exitoso! Bienvenido a GroupGrow.');
+        navigate('/dashboard');
+
       } else {
         // Error del servidor (ej: email ya existe)
         const errorMessage = await response.text();
@@ -83,7 +86,6 @@ export function RegisterPage() {
       // Error de red
       setError('No se pudo conectar con el servidor. Revisa tu conexión.');
     }
-    // === FIN DE LA CORRECCIÓN ===
   };
 
   return (

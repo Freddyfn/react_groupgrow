@@ -7,7 +7,7 @@ import { Badge } from './ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
 import { Label } from './ui/label';
 import { Separator } from './ui/separator';
-import { Users, Target, Lock, Search, UserPlus, Eye } from 'lucide-react';
+import { Users, Target, Lock, Search, UserPlus, Eye, Edit } from 'lucide-react';
 import { toast } from 'sonner@2.0.3';
 
 interface PublicGroup {
@@ -28,6 +28,9 @@ export function Groups() {
   const [searchTerm, setSearchTerm] = useState('');
   const [privateGroupCode, setPrivateGroupCode] = useState('');
   const [isJoiningPrivate, setIsJoiningPrivate] = useState(false);
+  
+  // Usuario actual (en una app real vendría del contexto de autenticación)
+  const currentUser = 'María González';
 
   // Mock data para grupos públicos
   const [publicGroups] = useState<PublicGroup[]>([
@@ -278,9 +281,22 @@ export function Groups() {
                     <Badge className={getCategoryColor(group.category)}>
                       {group.category}
                     </Badge>
-                    <div className="flex items-center text-sm text-muted-foreground">
-                      <Users className="h-4 w-4 mr-1" />
-                      {group.currentMembers}/{group.maxMembers}
+                    <div className="flex items-center gap-2">
+                      <div className="flex items-center text-sm text-muted-foreground">
+                        <Users className="h-4 w-4 mr-1" />
+                        {group.currentMembers}/{group.maxMembers}
+                      </div>
+                      {group.creator === currentUser && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-8 w-8 p-0 rounded-full"
+                          onClick={() => navigate(`/edit-group/${group.id}`)}
+                          title="Editar grupo"
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                      )}
                     </div>
                   </div>
                   <CardTitle className="text-lg">{group.name}</CardTitle>

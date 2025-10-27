@@ -7,6 +7,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/
 import { Checkbox } from './ui/checkbox';
 import { Alert, AlertDescription } from './ui/alert';
 import { Shield, Mail, Lock, Eye, EyeOff } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext'; // <--- Integrado
+import { toast } from 'sonner@2.0.3'; // <--- Integrado
 
 export function LoginPage() {
   const [email, setEmail] = useState('');
@@ -17,43 +19,53 @@ export function LoginPage() {
   const [twoFACode, setTwoFACode] = useState('');
   const [error, setError] = useState('');
   const navigate = useNavigate();
+  const { login } = useAuth(); // <--- Integrado
 
   const handleLogin = async (e: React.FormEvent) => {
-  e.preventDefault();
-  setError('');
+    e.preventDefault();
+    setError('');
 
-  if (!email || !password) {
-    setError('Por favor completa todos los campos');
-    return;
-  }
-
-  try {
-    const response = await fetch('/api/auth/login', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        email,
-        passwordHash: password,
-      }),
-    });
-
-    if (response.ok) {
-      navigate('/dashboard');
-    } else {
-      const errorMessage = await response.text();
-      setError(errorMessage || 'Credenciales inválidas. Inténtalo de nuevo.');
+    if (!email || !password) {
+      setError('Por favor completa todos los campos');
+      return;
     }
-  } catch (err) {
-    setError('No se pudo conectar con el servidor. Revisa tu conexión.');
-  }
-};
+
+    try {
+      // 1. Llama al backend real (de tu primer código)
+      const response = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email,
+          passwordHash: password,
+        }),
+      });
+
+      if (response.ok) {
+        // 2. Si las credenciales son válidas, muestra el 2FA (de tu segundo código)
+        setShow2FA(true);
+      } else {
+        const errorMessage = await response.text();
+        setError(errorMessage || 'Credenciales inválidas. Inténtalo de nuevo.');
+      }
+    } catch (err) {
+      setError('No se pudo conectar con el servidor. Revisa tu conexión.');
+    }
+  };
 
   const handle2FA = (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // 3. Verifica el código 2FA (simulado, de tu segundo código)
     if (twoFACode === '123456') {
-      navigate('/dashboard');
+      
+      // 4. Autentica al usuario en el contexto, muestra el toast y navega
+      login(email, password); // <--- Integrado
+      toast.success('¡Inicio de sesión exitoso!'); // <--- Integrado
+      navigate('/dashboard'); // <--- Integrado
+
     } else {
       setError('Código 2FA incorrecto');
     }

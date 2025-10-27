@@ -1,30 +1,44 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Button } from './ui/button';
 import { Sheet, SheetContent, SheetTrigger } from './ui/sheet';
-import { Menu, User, LogOut, Settings } from 'lucide-react';
+import { Menu, User, LogOut, Settings, DoorOpen } from 'lucide-react';
 import { 
   DropdownMenu, 
   DropdownMenuContent, 
   DropdownMenuItem, 
-  DropdownMenuTrigger 
+  DropdownMenuTrigger,
+  DropdownMenuSeparator
 } from './ui/dropdown-menu';
+import { useAuth } from '../contexts/AuthContext';
 
 export function Navbar() {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
   const navigate = useNavigate();
+  const { isAuthenticated, user, logout } = useAuth();
 
   const handleLogout = () => {
-    setIsAuthenticated(false);
+    logout();
     navigate('/');
   };
 
-  const navigationItems = [
-    { label: 'Inicio', href: '/' },
-    { label: 'Dashboard', href: '/dashboard' },
-    { label: 'Grupos', href: '/groups' },
-    { label: 'Recursos', href: '/resources' },
-  ];
+  // Filtrar items de navegación según el estado de autenticación
+  const getNavigationItems = () => {
+    const baseItems = [
+      { label: 'Dashboard', href: '/dashboard' },
+      { label: 'Grupos', href: '/groups' },
+      { label: 'Mis Grupos', href: '/my-groups' },
+      { label: 'Recursos', href: '/resources' },
+    ];
+
+    // Agregar "Inicio" solo si NO está autenticado
+    if (!isAuthenticated) {
+      return [{ label: 'Inicio', href: '/' }, ...baseItems];
+    }
+
+    return baseItems;
+  };
+
+  const navigationItems = getNavigationItems();
 
   return (
     <nav className="bg-white shadow-sm border-b">
@@ -55,25 +69,26 @@ export function Navbar() {
           {/* Auth Section */}
           <div className="flex items-center space-x-4">
             {isAuthenticated ? (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" className="p-2">
-                    <User className="h-5 w-5" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={() => navigate('/profile')}>
-                    <Settings className="mr-2 h-4 w-4" />
-                    Perfil
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={handleLogout}>
-                    <LogOut className="mr-2 h-4 w-4" />
-                    Cerrar Sesión
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+              <div className="hidden md:flex items-center space-x-2">
+                <Button 
+                  variant="outline"
+                  onClick={() => navigate('/profile')}
+                  className="gap-2"
+                >
+                  <User className="h-4 w-4" />
+                  Perfil
+                </Button>
+                <Button 
+                  variant="outline"
+                  onClick={handleLogout}
+                  className="gap-2"
+                >
+                  <DoorOpen className="h-4 w-4" />
+                  Salir
+                </Button>
+              </div>
             ) : (
-              <div className="flex space-x-2">
+              <div className="hidden md:flex space-x-2">
                 <Button variant="ghost" asChild>
                   <Link to="/login">Iniciar Sesión</Link>
                 </Button>
@@ -102,6 +117,37 @@ export function Navbar() {
                         {item.label}
                       </Link>
                     ))}
+                    <div className="border-t pt-4 mt-4">
+                      {isAuthenticated ? (
+                        <>
+                          <Button 
+                            variant="outline"
+                            onClick={() => navigate('/profile')}
+                            className="w-full mb-2 justify-start gap-2"
+                          >
+                            <User className="h-4 w-4" />
+                            Perfil
+                          </Button>
+                          <Button 
+                            variant="outline"
+                            onClick={handleLogout}
+                            className="w-full justify-start gap-2"
+                          >
+                            <DoorOpen className="h-4 w-4" />
+                            Salir
+                          </Button>
+                        </>
+                      ) : (
+                        <>
+                          <Button variant="ghost" asChild className="w-full mb-2">
+                            <Link to="/login">Iniciar Sesión</Link>
+                          </Button>
+                          <Button asChild className="w-full">
+                            <Link to="/register">Registrarse</Link>
+                          </Button>
+                        </>
+                      )}
+                    </div>
                   </div>
                 </SheetContent>
               </Sheet>
