@@ -7,6 +7,7 @@ import { Badge } from './ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { Alert, AlertDescription } from './ui/alert';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from './ui/alert-dialog';
 import { 
   LineChart, 
   Line, 
@@ -31,24 +32,35 @@ import {
   Bot,
   Download,
   MessageSquare,
-  CreditCard
+  CreditCard,
+  LogOut,
+  Wallet,
+  Lock,
+  Unlock
 } from 'lucide-react';
 
 export function GroupDashboard() {
   const { groupId } = useParams();
   const [timeLeft, setTimeLeft] = useState({ days: 15, hours: 8, minutes: 42 });
   const [showVotingModal, setShowVotingModal] = useState(false);
+  const [showWithdrawDialog, setShowWithdrawDialog] = useState(false);
+  const [withdrawType, setWithdrawType] = useState<'savings' | 'profits'>('savings');
 
   // Mock data for the group
   const groupData = {
     id: groupId,
     name: 'Vacaciones Familia 2025',
     description: 'Ahorro grupal para unas vacaciones familiares increíbles',
+    type: 'investment', // 'savings' or 'investment'
     target: 10000,
     current: 6500,
     monthlyContribution: 500,
     deadline: '2025-06-01',
+    investmentTerm: '2025-04-01', // Fecha hasta la cual está bloqueada la inversión
     status: 'active',
+    userContribution: 1750, // Contribución del usuario actual
+    userProfits: 125, // Ganancias del usuario actual (solo para inversiones)
+    totalProfits: 450, // Ganancias totales del grupo
     members: [
       { id: 1, name: 'María García', avatar: '', contribution: 1800, status: 'current' },
       { id: 2, name: 'Carlos López', avatar: '', contribution: 1600, status: 'current' },
@@ -110,6 +122,28 @@ export function GroupDashboard() {
     alert(`Descargando reporte en formato ${format.toUpperCase()}...`);
   };
 
+  // Verificar si se puede retirar la inversión (después del plazo)
+  const canWithdrawInvestment = () => {
+    if (groupData.type === 'savings') return true;
+    const currentDate = new Date();
+    const termDate = new Date(groupData.investmentTerm);
+    return currentDate >= termDate;
+  };
+
+  const handleWithdraw = (type: 'savings' | 'profits') => {
+    setWithdrawType(type);
+    setShowWithdrawDialog(true);
+  };
+
+  const confirmWithdraw = () => {
+    if (withdrawType === 'savings') {
+      alert(`Retirando tu ${groupData.type === 'savings' ? 'ahorro' : 'inversión'}: ${groupData.userContribution.toLocaleString()}`);
+    } else {
+      alert(`Retirando tus ganancias: ${groupData.userProfits.toLocaleString()}`);
+    }
+    setShowWithdrawDialog(false);
+  };
+
   return (
     <div className="max-w-7xl mx-auto p-6 space-y-8">
       {/* Header */}
@@ -155,11 +189,18 @@ export function GroupDashboard() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm">Progreso Actual</CardTitle>
+            <CardTitle className="text-sm">
+              {groupData.type === 'savings' ? 'Ahorros Actuales' : 'Inversión Actual'}
+            </CardTitle>
             <Target className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl">${groupData.current.toLocaleString()}</div>
+            {groupData.type === 'investment' && groupData.totalProfits > 0 && (
+              <div className="text-sm text-green-600">
+                +${groupData.totalProfits.toLocaleString()} en ganancias
+              </div>
+            )}
             <div className="mt-2">
               <Progress value={(groupData.current / groupData.target) * 100} />
             </div>
@@ -197,19 +238,172 @@ export function GroupDashboard() {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm">Tiempo Restante</CardTitle>
+            <CardTitle className="text-sm">
+              {groupData.type === 'investment' ? 'Plazo de Inversión' : 'Tiempo Restante'}
+            </CardTitle>
             <Clock className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-lg">
-              {timeLeft.days}d {timeLeft.hours}h {timeLeft.minutes}m
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Hasta la fecha límite
-            </p>
+            {groupData.type === 'investment' ? (
+              <div>
+                <div className="text-lg">
+                  {canWithdrawInvestment() ? 'Disponible' : `${timeLeft.days}d ${timeLeft.hours}h`}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {canWithdrawInvestment() ? 
+                    'Inversión lista para retiro' : 
+                    'Hasta poder retirar inversión'}
+                </p>
+                {canWithdrawInvestment() && (
+                  <Badge variant="default" className="mt-1 text-xs bg-green-600">
+                    <Unlock className="w-3 h-3 mr-1" />
+                    Desbloqueado
+                  </Badge>
+                )}
+              </div>
+            ) : (
+              <div>
+                <div className="text-lg">
+                  {timeLeft.days}d {timeLeft.hours}h {timeLeft.minutes}m
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Hasta la fecha límite
+                </p>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
+
+      {/* Withdraw Actions */}
+      <Card className="border-2 border-accent/20 bg-accent/5">
+        <CardHeader>
+          <CardTitle className="flex items-center">
+            <Wallet className="mr-2 h-5 w-5" />
+            Gestión de Retiros
+          </CardTitle>
+          <CardDescription>
+            Administra tus {groupData.type === 'savings' ? 'ahorros' : 'inversiones'} y retira fondos cuando sea necesario
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Retiro de Ahorro/Inversión */}
+            <div className="p-4 border rounded-lg bg-card">
+              <div className="flex items-center justify-between mb-3">
+                <div>
+                  <h4 className="font-semibold">
+                    {groupData.type === 'savings' ? 'Retiro de Ahorros' : 'Retiro de Inversión'}
+                  </h4>
+                  <p className="text-sm text-muted-foreground">
+                    Tu contribución: ${groupData.userContribution.toLocaleString()}
+                  </p>
+                </div>
+                {groupData.type === 'investment' && !canWithdrawInvestment() && (
+                  <Lock className="h-4 w-4 text-yellow-600" />
+                )}
+              </div>
+              
+              {groupData.type === 'investment' && !canWithdrawInvestment() && (
+                <Alert className="mb-3 border-yellow-200 bg-yellow-50">
+                  <Clock className="h-4 w-4" />
+                  <AlertDescription className="text-sm">
+                    Tu inversión estará disponible para retiro después del <strong>{new Date(groupData.investmentTerm).toLocaleDateString()}</strong>
+                  </AlertDescription>
+                </Alert>
+              )}
+
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button 
+                    variant="outline" 
+                    className="w-full"
+                    disabled={groupData.type === 'investment' && !canWithdrawInvestment()}
+                    onClick={() => handleWithdraw('savings')}
+                  >
+                    <LogOut className="mr-2 h-4 w-4" />
+                    {groupData.type === 'investment' && !canWithdrawInvestment() ? 'Bloqueado hasta fecha límite' : 
+                     groupData.type === 'savings' ? 'Retirar Ahorros' : 'Retirar Inversión'}
+                  </Button>
+                </AlertDialogTrigger>
+              </AlertDialog>
+            </div>
+
+            {/* Retiro de Ganancias (solo para inversiones) */}
+            {groupData.type === 'investment' && (
+              <div className="p-4 border rounded-lg bg-card">
+                <div className="flex items-center justify-between mb-3">
+                  <div>
+                    <h4 className="font-semibold">Retiro de Ganancias</h4>
+                    <p className="text-sm text-muted-foreground">
+                      Tus ganancias: ${groupData.userProfits.toLocaleString()}
+                    </p>
+                  </div>
+                  <Unlock className="h-4 w-4 text-green-600" />
+                </div>
+                
+                <Alert className="mb-3 border-green-200 bg-green-50">
+                  <TrendingUp className="h-4 w-4" />
+                  <AlertDescription className="text-sm">
+                    Las ganancias están disponibles para retiro en cualquier momento
+                  </AlertDescription>
+                </Alert>
+
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button 
+                      variant="outline" 
+                      className="w-full"
+                      onClick={() => handleWithdraw('profits')}
+                      disabled={groupData.userProfits <= 0}
+                    >
+                      <Wallet className="mr-2 h-4 w-4" />
+                      {groupData.userProfits > 0 ? 'Retirar Ganancias' : 'Sin ganancias disponibles'}
+                    </Button>
+                  </AlertDialogTrigger>
+                </AlertDialog>
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Withdraw Confirmation Dialog */}
+      <AlertDialog open={showWithdrawDialog} onOpenChange={setShowWithdrawDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              Confirmar {withdrawType === 'savings' ? 
+                (groupData.type === 'savings' ? 'Retiro de Ahorros' : 'Retiro de Inversión') : 
+                'Retiro de Ganancias'}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {withdrawType === 'savings' ? (
+                <>
+                  ¿Estás seguro de que quieres retirar tu {groupData.type === 'savings' ? 'ahorro' : 'inversión'} 
+                  de <strong>${groupData.userContribution.toLocaleString()}</strong>?
+                  <br /><br />
+                  <strong>Importante:</strong> {groupData.type === 'savings' ? 
+                    'Al retirar tus ahorros, saldrás del grupo y no podrás volver a unirte.' :
+                    'Al retirar tu inversión, saldrás del grupo de inversión y perderás cualquier beneficio futuro.'}
+                </>
+              ) : (
+                <>
+                  ¿Estás seguro de que quieres retirar tus ganancias de <strong>${groupData.userProfits.toLocaleString()}</strong>?
+                  <br /><br />
+                  <strong>Nota:</strong> Esto no afectará tu participación en el grupo, solo retirará las ganancias generadas hasta ahora.
+                </>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmWithdraw} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Confirmar Retiro
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Main Content Tabs */}
       <Tabs defaultValue="overview" className="w-full">
