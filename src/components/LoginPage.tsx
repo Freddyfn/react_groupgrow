@@ -7,23 +7,34 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/
 import { Checkbox } from './ui/checkbox';
 import { Alert, AlertDescription } from './ui/alert';
 import { Shield, Mail, Lock, Eye, EyeOff } from 'lucide-react';
-import { useAuth } from '../contexts/AuthContext'; // <--- Integrado
-import { toast } from 'sonner@2.0.3'; // <--- Integrado
+import { useAuth } from '../contexts/AuthContext';
+import { toast } from 'sonner';
+
+// --- IMPORTS AÑADIDOS ---
+import axios from 'axios'; // Usaremos axios para las llamadas API
+import { InputOTP, InputOTPGroup, InputOTPSlot } from './ui/input-otp'; // Componente para el código
 
 export function LoginPage() {
+  // --- ESTADOS EXISTENTES ---
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [remember, setRemember] = useState(false);
-  const [show2FA, setShow2FA] = useState(false);
-  const [twoFACode, setTwoFACode] = useState('');
   const [error, setError] = useState('');
   const navigate = useNavigate();
-  const { login } = useAuth(); // <--- Integrado
+  const { login } = useAuth(); // Función login del contexto
 
+  // --- ESTADOS NUEVOS PARA 2FA ---
+  const [show2FA, setShow2FA] = useState(false); // Controla qué pantalla mostrar (login o código)
+  const [twoFACode, setTwoFACode] = useState(''); // Almacena el código 2FA ingresado
+  const [pendingUserId, setPendingUserId] = useState<number | null>(null); // Guarda el ID del usuario mientras se verifica el 2FA
+
+  /**
+   * Manejador para el formulario de login inicial (email/contraseña).
+   */
   const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError('');
+    e.preventDefault(); // Evita que la página se recargue
+    setError(''); // Limpia errores anteriores
 
     if (!email || !password) {
       setError('Por favor completa todos los campos');
@@ -31,50 +42,106 @@ export function LoginPage() {
     }
 
     try {
-      // 1. Llama al backend real (de tu primer código)
-      const response = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          email,
-          passwordHash: password,
-        }),
+      // 1. Llama al endpoint /api/auth/login del backend
+      const response = await axios.post('/api/auth/login', {
+        email,
+        passwordHash: password, // Tu backend espera 'passwordHash'
       });
 
-      if (response.ok) {
-        // 2. Si las credenciales son válidas, muestra el 2FA (de tu segundo código)
-        setShow2FA(true);
+      // 2. Procesa la respuesta del backend (nuestro DTO LoginResponse)
+      const { status, token, userId } = response.data;
+
+      if (status === '2FA_REQUIRED') {
+        // 2a. ¡Éxito parcial! El backend requiere verificación 2FA.
+        setPendingUserId(userId); // Guarda el ID del usuario para el siguiente paso
+        setShow2FA(true); // Muestra la pantalla de ingreso de código 2FA
+        setPassword(''); // Borra la contraseña del estado por seguridad
+      } else if (status === 'SUCCESS') {
+        // 2b. ¡Éxito completo! Login directo (2FA no estaba activo o ya se verificó).
+        // Extraemos datos básicos del usuario (esto debería venir del backend o token)
+        const userName = email.split('@')[0]; // Simulación, obtén el nombre real
+        // Llama a la función login del AuthContext para guardar el token y usuario
+        login(token, { id: userId, email: email, name: userName });
+        toast.success('¡Inicio de sesión exitoso!'); // Muestra notificación
+        navigate('/dashboard'); // Redirige al dashboard
       } else {
-        const errorMessage = await response.text();
-        setError(errorMessage || 'Credenciales inválidas. Inténtalo de nuevo.');
+        // La respuesta no fue ni SUCCESS ni 2FA_REQUIRED (puede ser FAILURE)
+        setError('Credenciales inválidas. Inténtalo de nuevo.');
       }
-    } catch (err) {
-      setError('No se pudo conectar con el servidor. Revisa tu conexión.');
+    } catch (err: any) {
+      // Error en la llamada API (ej. 400 Bad Request, 500 Server Error)
+      console.error("Error en login:", err);
+      if (err.response && err.response.data && typeof err.response.data === 'string') {
+        setError(err.response.data); // Muestra mensaje de error del backend si existe
+      } else if (err.response && err.response.data && err.response.data.status === 'FAILURE') {
+         setError('Credenciales inválidas. Inténtalo de nuevo.'); // Mensaje específico para FAILURE
+      }
+       else {
+        setError('Error al conectar con el servidor. Revisa tu conexión.');
+      }
     }
   };
 
-  const handle2FA = (e: React.FormEvent) => {
+  /**
+   * Manejador para el formulario de verificación 2FA (código OTP).
+   */
+  const handle2FA = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    // 3. Verifica el código 2FA (simulado, de tu segundo código)
-    if (twoFACode === '123456') {
-      
-      // 4. Autentica al usuario en el contexto, muestra el toast y navega
-      login(email, password); // <--- Integrado
-      toast.success('¡Inicio de sesión exitoso!'); // <--- Integrado
-      navigate('/dashboard'); // <--- Integrado
+    setError('');
 
-    } else {
-      setError('Código 2FA incorrecto');
+    if (!pendingUserId) {
+      setError('Error inesperado. Vuelve a iniciar sesión.');
+      setShow2FA(false); // Vuelve a la pantalla de login
+      return;
+    }
+    if (twoFACode.length !== 6) {
+        setError('El código debe tener 6 dígitos.');
+        return;
+    }
+
+    try {
+      // 3. Llama al endpoint /api/auth/2fa/login-verify del backend
+      const response = await axios.post('/api/auth/2fa/login-verify', {
+        userId: pendingUserId,
+        code: twoFACode
+      });
+
+      // 4. Procesa la respuesta del backend
+      const { status, token, userId } = response.data;
+
+      if (status === 'SUCCESS') {
+        // 5. ¡Verificación 2FA exitosa!
+        const userName = email.split('@')[0]; // Simulación
+        // Llama a la función login del AuthContext
+        login(token, { id: userId, email: email, name: userName });
+        toast.success('¡Inicio de sesión exitoso!');
+        navigate('/dashboard');
+      } else {
+         // Aunque el backend debería devolver error 400, por si acaso
+         setError('Código 2FA incorrecto.');
+         setTwoFACode(''); // Limpia el campo
+      }
+    } catch (err: any) {
+      // Error en la llamada API (probablemente 400 Bad Request por código incorrecto)
+      console.error("Error en verificación 2FA:", err);
+      if (err.response && err.response.data && typeof err.response.data === 'string') {
+        setError(err.response.data); // Muestra mensaje del backend
+      } else {
+        setError('Código 2FA incorrecto o error del servidor.');
+      }
+      setTwoFACode(''); // Limpia el campo en caso de error
     }
   };
 
+  /**
+   * Manejador para el enlace "¿Olvidaste tu contraseña?".
+   */
   const handleForgotPassword = () => {
-    alert('Se ha enviado un enlace de recuperación a tu email');
+    // TODO: Implementar lógica real de recuperación de contraseña
+    toast.info('Funcionalidad de recuperación de contraseña aún no implementada.');
   };
 
+  // --- RENDERIZADO CONDICIONAL: PANTALLA DE 2FA ---
   if (show2FA) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-muted/30 py-12 px-4 sm:px-6 lg:px-8">
@@ -83,42 +150,59 @@ export function LoginPage() {
             <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center mx-auto mb-4">
               <Shield className="h-6 w-6 text-primary" />
             </div>
-            <CardTitle>Verificación 2FA</CardTitle>
+            <CardTitle>Verificación de Dos Pasos</CardTitle>
             <CardDescription>
-              Ingresa el código de 6 dígitos de tu aplicación autenticadora
+              Ingresa el código de 6 dígitos de tu aplicación autenticadora (Authy, Google Authenticator, etc.)
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <form onSubmit={handle2FA} className="space-y-4">
+            <form onSubmit={handle2FA} className="space-y-6">
+              {/* Muestra errores específicos de la verificación 2FA */}
               {error && (
                 <Alert variant="destructive">
                   <AlertDescription>{error}</AlertDescription>
                 </Alert>
               )}
-              
-              <div>
-                <Label htmlFor="twofa">Código de Verificación</Label>
-                <Input
-                  id="twofa"
-                  value={twoFACode}
-                  onChange={(e) => setTwoFACode(e.target.value)}
-                  placeholder="123456"
+
+              {/* Input para el código OTP */}
+              <div className="flex justify-center">
+                <InputOTP
                   maxLength={6}
-                  className="text-center text-lg tracking-widest"
-                />
+                  value={twoFACode}
+                  onChange={(value) => setTwoFACode(value)}
+                  // Estilos para centrarlo y hacerlo más grande si quieres
+                  // containerClassName="justify-center"
+                >
+                  <InputOTPGroup>
+                    <InputOTPSlot index={0} />
+                    <InputOTPSlot index={1} />
+                    <InputOTPSlot index={2} />
+                    <InputOTPSlot index={3} />
+                    <InputOTPSlot index={4} />
+                    <InputOTPSlot index={5} />
+                  </InputOTPGroup>
+                </InputOTP>
               </div>
 
-              <Button type="submit" className="w-full">
-                Verificar
+              {/* Botón para verificar el código */}
+              <Button type="submit" className="w-full" disabled={twoFACode.length !== 6}>
+                Verificar Código
               </Button>
 
+              {/* Opción para volver a la pantalla de login */}
               <div className="text-center">
-                <Button 
-                  variant="ghost" 
-                  onClick={() => setShow2FA(false)}
+                <Button
+                  type="button" // Importante: type="button" para no enviar el formulario
+                  variant="ghost"
+                  onClick={() => {
+                    setShow2FA(false); // Oculta esta pantalla
+                    setError(''); // Limpia errores
+                    setTwoFACode(''); // Limpia el código
+                    setPendingUserId(null); // Borra el ID pendiente
+                  }}
                   className="text-sm"
                 >
-                  Volver al login
+                  Volver al inicio de sesión
                 </Button>
               </div>
             </form>
@@ -128,6 +212,7 @@ export function LoginPage() {
     );
   }
 
+  // --- RENDERIZADO POR DEFECTO: PANTALLA DE LOGIN ---
   return (
     <div className="min-h-screen flex items-center justify-center bg-muted/30 py-12 px-4 sm:px-6 lg:px-8">
       <Card className="w-full max-w-md">
@@ -139,12 +224,14 @@ export function LoginPage() {
         </CardHeader>
         <CardContent>
           <form onSubmit={handleLogin} className="space-y-4">
+            {/* Muestra errores del login (email/contraseña) */}
             {error && (
               <Alert variant="destructive">
                 <AlertDescription>{error}</AlertDescription>
               </Alert>
             )}
 
+            {/* Input de Email */}
             <div>
               <Label htmlFor="email">Email</Label>
               <div className="relative">
@@ -156,10 +243,12 @@ export function LoginPage() {
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="tu@email.com"
                   className="pl-10"
+                  required // Añadido para validación básica
                 />
               </div>
             </div>
 
+            {/* Input de Contraseña */}
             <div>
               <Label htmlFor="password">Contraseña</Label>
               <div className="relative">
@@ -171,13 +260,16 @@ export function LoginPage() {
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="Tu contraseña"
                   className="pl-10 pr-10"
+                  required // Añadido para validación básica
                 />
+                {/* Botón para mostrar/ocultar contraseña */}
                 <Button
                   type="button"
                   variant="ghost"
                   size="sm"
                   className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
                   onClick={() => setShowPassword(!showPassword)}
+                  aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
                 >
                   {showPassword ? (
                     <EyeOff className="h-4 w-4" />
@@ -188,43 +280,41 @@ export function LoginPage() {
               </div>
             </div>
 
+            {/* Opciones: Recordarme y Olvidé contraseña */}
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-2">
-                <Checkbox 
-                  id="remember" 
+                <Checkbox
+                  id="remember"
                   checked={remember}
-                  onCheckedChange={setRemember}
+                  onCheckedChange={(val) => setRemember(val as boolean)}
                 />
-                <Label htmlFor="remember" className="text-sm">
+                <Label htmlFor="remember" className="text-sm cursor-pointer">
                   Recordarme
                 </Label>
               </div>
-              <Button 
-                variant="link" 
-                className="text-sm p-0"
+              <Button
+                type="button"
+                variant="link"
+                className="text-sm p-0 h-auto" // Ajustado para mejor alineación
                 onClick={handleForgotPassword}
               >
                 ¿Olvidaste tu contraseña?
               </Button>
             </div>
 
+            {/* Botón principal de Login */}
             <Button type="submit" className="w-full">
               Iniciar Sesión
             </Button>
           </form>
 
+          {/* Enlace a Registro */}
           <div className="mt-6 text-center">
             <p className="text-sm text-muted-foreground">
               ¿No tienes cuenta?{' '}
-              <Link to="/register" className="text-primary hover:underline">
+              <Link to="/register" className="font-medium text-primary hover:underline">
                 Regístrate aquí
               </Link>
-            </p>
-          </div>
-
-          <div className="mt-4 p-3 bg-muted rounded-lg">
-            <p className="text-xs text-muted-foreground text-center">
-              <strong>Demo:</strong> email: demo@example.com, contraseña: demo123, 2FA: 123456
             </p>
           </div>
         </CardContent>
