@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { User, Mail, Lock, Eye, EyeOff, Phone } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext'; // <--- Integrado
 import { toast } from 'sonner@2.0.3'; // <--- Integrado
+import axios from 'axios';
 
 export function RegisterPage() {
   const [formData, setFormData] = useState({
@@ -72,10 +73,44 @@ export function RegisterPage() {
       });
 
       if (response.ok) {
-        // 2. Si el registro es exitoso, auto-login y notifica (de tu segundo código)
-        login(formData.email, formData.password);
-        toast.success('¡Registro exitoso! Bienvenido a GroupGrow.');
-        navigate('/dashboard');
+        // 2. Si el registro es exitoso, hacer login automático
+        try {
+          const loginResponse = await axios.post('/api/auth/login', {
+            email: formData.email,
+            passwordHash: formData.password,
+          });
+
+          const { status, token, userId } = loginResponse.data;
+
+          if (status === 'SUCCESS') {
+            // Construir el nombre completo del usuario
+            const fullName = `${formData.firstName} ${formData.lastName}`.trim();
+            
+            // Guardar en el contexto de autenticación
+            login(token, { 
+              id: userId, 
+              email: formData.email, 
+              name: fullName || formData.email.split('@')[0] 
+            });
+            
+            toast.success('¡Registro exitoso! Bienvenido a GroupGrow.');
+            navigate('/dashboard');
+          } else if (status === '2FA_REQUIRED') {
+            // Si requiere 2FA, el usuario necesita completar la verificación
+            // No guardamos el token aún, el usuario debe completar el 2FA primero
+            toast.info('Registro exitoso. Por favor, completa la verificación de dos factores.');
+            navigate('/login');
+          } else {
+            // Login falló después del registro
+            toast.warning('Registro exitoso, pero no se pudo iniciar sesión automáticamente.');
+            navigate('/login');
+          }
+        } catch (loginError) {
+          // Error al hacer login automático
+          console.error("Error en login automático después del registro:", loginError);
+          toast.warning('Registro exitoso. Por favor, inicia sesión manualmente.');
+          navigate('/login');
+        }
 
       } else {
         // Error del servidor (ej: email ya existe)

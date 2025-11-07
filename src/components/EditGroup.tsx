@@ -12,6 +12,8 @@ import { Calendar } from './ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 import { CalendarIcon, Users, Target, DollarSign, ArrowLeft, Save } from 'lucide-react';
 import { toast } from 'sonner@2.0.3';
+import { useAuth } from '../contexts/AuthContext';
+import { groupService } from '../services/groupService';
 
 // Simple date formatter
 const formatDate = (date: Date) => {
@@ -22,60 +24,159 @@ const formatDate = (date: Date) => {
   });
 };
 
+interface MyGroup {
+  id: number;
+  name: string;
+  creatorId: number;
+  creatorName: string;
+  description?: string;
+  objective: string;
+  currentMembers: number;
+  maxMembers: number;
+  targetAmount: number;
+  currentAmount: number;
+  category?: string;
+  isPublic: boolean;
+  groupType: 'saving' | 'investment';
+  createdAt: string;
+  deadline?: string;
+  contributionFrequency?: string;
+  minimumContribution?: number;
+  riskLevel?: 'low' | 'medium' | 'high';
+  invitationCode?: string;
+}
+
+const getCategoryValue = (label: string) => {
+  const categories: { [key: string]: string } = {
+    'Educación': 'education',
+    'Viajes': 'travel',
+    'Fondo de Emergencia': 'emergency',
+    'Jubilación': 'retirement',
+    'Negocio': 'business',
+    'Vivienda': 'home',
+    'Salud': 'health',
+    'Otro': 'other'
+  };
+  return categories[label] || label.toLowerCase();
+};
+
 export function EditGroup() {
   const navigate = useNavigate();
   const { groupId } = useParams();
+  const { isAuthenticated, user } = useAuth();
   const [isLoading, setIsLoading] = useState(true);
+  const [group, setGroup] = useState<MyGroup | null>(null);
   const [formData, setFormData] = useState({
     groupName: '',
-    groupType: '', // 'investment' or 'saving'
+    groupType: '' as 'saving' | 'investment' | '',
     description: '',
     goal: '',
     targetAmount: '',
     deadline: undefined as Date | undefined,
     maxMembers: '',
-    privacy: '', // 'public' or 'private'
+    privacy: '' as 'public' | 'private' | '',
     invitationCode: '',
-    contributionFrequency: '', // 'weekly', 'monthly', 'quarterly'
+    contributionFrequency: '',
     minimumContribution: '',
-    riskLevel: '', // 'low', 'medium', 'high'
-    category: '' // 'education', 'travel', 'emergency', 'retirement', 'business', 'other'
+    riskLevel: '' as 'low' | 'medium' | 'high' | '',
+    category: ''
   });
   const [error, setError] = useState('');
 
-  // Mock: Cargar datos del grupo
+  // Cargar datos del grupo desde la API
   useEffect(() => {
-    // Simulamos la carga de datos del grupo
-    const mockGroupData = {
-      groupName: 'Ahorro para Vacaciones 2025',
-      groupType: 'saving',
-      description: 'Ahorrar para unas vacaciones familiares en Europa visitando París, Roma y Barcelona',
-      goal: 'Vacaciones familiares en Europa',
-      targetAmount: '50000',
-      deadline: new Date(2025, 11, 31), // 31 de diciembre 2025
-      maxMembers: '20',
-      privacy: 'public',
-      invitationCode: '',
-      contributionFrequency: 'monthly',
-      minimumContribution: '500',
-      riskLevel: '',
-      category: 'travel'
+    if (!groupId || !user) {
+      setIsLoading(false);
+      return;
+    }
+
+    const loadGroup = async () => {
+      try {
+        setIsLoading(true);
+        const groupData = await groupService.getGroupById(parseInt(groupId));
+        
+        // Verificar que el usuario es el creador
+        if (groupData.creatorId !== user.id) {
+          setError('No tienes permisos para editar este grupo');
+          setIsLoading(false);
+          toast.error('Solo el creador puede editar este grupo');
+          setTimeout(() => navigate('/my-groups'), 2000);
+          return;
+        }
+
+        // Convertir a MyGroup
+        const foundGroup: MyGroup = {
+          id: groupData.id,
+          name: groupData.name,
+          creatorId: groupData.creatorId,
+          creatorName: groupData.creatorName,
+          description: groupData.description,
+          objective: groupData.objective,
+          currentMembers: groupData.currentMembers,
+          maxMembers: groupData.maxMembers,
+          targetAmount: Number(groupData.targetAmount),
+          currentAmount: Number(groupData.currentAmount),
+          category: groupData.category || '',
+          isPublic: groupData.privacy === 'public',
+          groupType: groupData.type as 'saving' | 'investment',
+          createdAt: groupData.createdAt,
+          deadline: groupData.deadline,
+          contributionFrequency: groupData.contributionFrequency,
+          minimumContribution: groupData.minimumContribution ? Number(groupData.minimumContribution) : undefined,
+          riskLevel: groupData.riskLevel as any,
+          invitationCode: groupData.invitationCode
+        };
+
+        setGroup(foundGroup);
+        
+        // Cargar datos en el formulario
+        setFormData({
+          groupName: foundGroup.name,
+          groupType: foundGroup.groupType,
+          description: foundGroup.description || '',
+          goal: foundGroup.objective,
+          targetAmount: foundGroup.targetAmount.toString(),
+          deadline: foundGroup.deadline ? new Date(foundGroup.deadline) : undefined,
+          maxMembers: foundGroup.maxMembers.toString(),
+          privacy: foundGroup.isPublic ? 'public' : 'private',
+          invitationCode: foundGroup.invitationCode || '',
+          contributionFrequency: foundGroup.contributionFrequency || '',
+          minimumContribution: foundGroup.minimumContribution?.toString() || '',
+          riskLevel: foundGroup.riskLevel || '',
+          category: getCategoryValue(foundGroup.category || '')
+        });
+      } catch (error: any) {
+        console.error('Error al cargar grupo:', error);
+        setError(error.response?.data?.message || 'Error al cargar el grupo');
+        toast.error(error.response?.data?.message || 'Error al cargar el grupo');
+        setTimeout(() => navigate('/my-groups'), 2000);
+      } finally {
+        setIsLoading(false);
+      }
     };
 
-    // Simular un pequeño delay de carga
-    setTimeout(() => {
-      setFormData(mockGroupData);
-      setIsLoading(false);
-    }, 500);
-  }, [groupId]);
+    loadGroup();
+  }, [groupId, user, navigate]);
 
   const handleInputChange = (field: string, value: string | Date | undefined) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+
+    if (!user || !group) {
+      setError('No se pudo verificar tu identidad');
+      return;
+    }
+
+    // Verificar permisos nuevamente
+    if (group.creatorId !== user.id) {
+      setError('No tienes permisos para editar este grupo');
+      toast.error('Solo el creador puede editar este grupo');
+      return;
+    }
 
     // Validation
     if (!formData.groupName || !formData.groupType || !formData.goal || !formData.targetAmount) {
@@ -93,9 +194,45 @@ export function EditGroup() {
       return;
     }
 
-    // Simulate saving changes
-    toast.success(`Grupo "${formData.groupName}" actualizado exitosamente`);
-    navigate('/my-groups');
+    // Actualizar grupo en el backend
+    try {
+      const updatedGroupData = await groupService.updateGroup(parseInt(groupId!), {
+        name: formData.groupName,
+        type: formData.groupType as 'saving' | 'investment',
+        description: formData.description || undefined,
+        goal: formData.goal,
+        targetAmount: parseFloat(formData.targetAmount),
+        deadline: formData.deadline?.toISOString().split('T')[0],
+        maxMembers: formData.maxMembers ? parseInt(formData.maxMembers) : undefined,
+        privacy: formData.privacy as 'public' | 'private',
+        invitationCode: formData.invitationCode || undefined,
+        contributionFrequency: formData.contributionFrequency as any || undefined,
+        minimumContribution: formData.minimumContribution ? parseFloat(formData.minimumContribution) : undefined,
+        riskLevel: formData.riskLevel as any || undefined,
+        category: formData.category || undefined
+      });
+
+      toast.success(`Grupo "${formData.groupName}" actualizado exitosamente`);
+      navigate('/my-groups');
+    } catch (error: any) {
+      console.error('Error al guardar grupo:', error);
+      setError(error.response?.data?.message || 'Error al guardar los cambios');
+      toast.error(error.response?.data?.message || 'Error al guardar los cambios');
+    }
+  };
+
+  const getCategoryLabel = (value: string) => {
+    const categories: { [key: string]: string } = {
+      'education': 'Educación',
+      'travel': 'Viajes',
+      'emergency': 'Fondo de Emergencia',
+      'retirement': 'Jubilación',
+      'business': 'Negocio',
+      'home': 'Vivienda',
+      'health': 'Salud',
+      'other': 'Otro'
+    };
+    return categories[value] || value;
   };
 
   const groupCategories = [
@@ -109,6 +246,14 @@ export function EditGroup() {
     { value: 'other', label: 'Otro' }
   ];
 
+  // Redirigir si no está autenticado
+  useEffect(() => {
+    if (!isLoading && !isAuthenticated) {
+      toast.error('Debes iniciar sesión para editar grupos');
+      navigate('/login');
+    }
+  }, [isAuthenticated, isLoading, navigate]);
+
   if (isLoading) {
     return (
       <div className="min-h-screen py-8 px-4 sm:px-6 lg:px-8 flex items-center justify-center">
@@ -118,6 +263,10 @@ export function EditGroup() {
         </div>
       </div>
     );
+  }
+
+  if (!isAuthenticated || !group) {
+    return null;
   }
 
   return (

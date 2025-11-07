@@ -23,6 +23,7 @@ import {
 // import axios from 'axios'; // <-- YA NO SE USA AQUÍ
 import { useAuth } from '../contexts/AuthContext';
 import { toast } from 'sonner';
+import { userService } from '../services/userService';
 
 export function Profile() {
   const { user } = useAuth();
@@ -44,29 +45,32 @@ export function Profile() {
   // const [isQrDialogOpen, setIsQrDialogOpen] = useState(false);
   // ... (todos los estados de QR, OTP, Error, Carga) ...
 
-  // useEffect para cargar datos (sin cambios)
+  // useEffect para cargar datos desde la API
   useEffect(() => {
     const fetchUserData = async () => {
       if (user) {
         try {
-          // --- Simulación ---
-          console.log(`Simulando carga de datos para usuario ID: ${user.id}`);
-          await new Promise(resolve => setTimeout(resolve, 500));
-          const userDataFromApi = {
-            firstName: user.name.split(' ')[0] || 'Usuario', lastName: user.name.split(' ')[1] || 'Demo',
-            email: user.email, phone: '+1234567890', bio: 'Bio simulada.',
-            riskProfile: 'moderate',
-            twofaEnabled: false, // <-- TODO: Reemplaza con llamada API real
-            kycStatus: 'verified' // <-- TODO: Reemplaza con llamada API real
-          };
-          // --- Fin Simulación ---
-          setProfileData(prev => ({ ...prev, firstName: userDataFromApi.firstName, lastName: userDataFromApi.lastName, email: userDataFromApi.email, phone: userDataFromApi.phone, bio: userDataFromApi.bio, riskProfile: userDataFromApi.riskProfile }));
-          setTwoFAEnabled(userDataFromApi.twofaEnabled);
-          setKycStatus(userDataFromApi.kycStatus);
+          const userDataFromApi = await userService.getProfile();
+          setProfileData(prev => ({ 
+            ...prev, 
+            firstName: userDataFromApi.firstName || '', 
+            lastName: userDataFromApi.lastName || '', 
+            email: userDataFromApi.email || user.email, 
+            phone: userDataFromApi.phone || '', 
+            riskProfile: userDataFromApi.riskProfile || 'moderate'
+          }));
+          setTwoFAEnabled(userDataFromApi.twofaEnabled || false);
+          setKycStatus(userDataFromApi.kycStatus || 'pending');
         } catch (error) {
           console.error("Error al cargar datos del perfil", error);
           toast.error("No se pudieron cargar los datos del perfil.");
-          setProfileData(prev => ({ ...prev, firstName: 'Error', lastName: 'Carga', email: user?.email || '' }));
+          // Fallback a datos básicos del contexto
+          setProfileData(prev => ({ 
+            ...prev, 
+            firstName: user.name?.split(' ')[0] || '', 
+            lastName: user.name?.split(' ')[1] || '', 
+            email: user?.email || '' 
+          }));
         }
       } else {
          setProfileData({ firstName: '', lastName: '', email: '', phone: '', bio: '', riskProfile: 'moderate', monthlyIncome: '', investmentGoals: '' });
@@ -80,7 +84,21 @@ export function Profile() {
   // Funciones de manejo (sin cambios)
   const handleProfileUpdate = (field: string, value: string) => setProfileData(prev => ({ ...prev, [field]: value }));
   const handleNotificationChange = (field: string, value: boolean) => setNotifications(prev => ({ ...prev, [field]: value }));
-  const saveProfile = () => { if (!user) return; toast.success('Perfil actualizado (simulado)'); };
+  const saveProfile = async () => { 
+    if (!user) return; 
+    try {
+      await userService.updateProfile({
+        firstName: profileData.firstName,
+        lastName: profileData.lastName,
+        phone: profileData.phone,
+        riskProfile: profileData.riskProfile
+      });
+      toast.success('Perfil actualizado correctamente.');
+    } catch (error) {
+      console.error("Error al actualizar perfil", error);
+      toast.error("No se pudo actualizar el perfil.");
+    }
+  };
   const saveNotifications = () => { toast.success('Notificaciones guardadas (simulado)'); };
   const startKYCProcess = () => { toast.info('Iniciando KYC... (simulado)'); };
 
@@ -98,12 +116,12 @@ export function Profile() {
     if (!user) return;
     if (confirm('¿Desactivar Autenticación de Dos Factores?')) {
       try {
-        // TODO: Endpoint backend para desactivar
-        await new Promise(resolve => setTimeout(resolve, 300)); // Simulación
+        await userService.disable2FA();
         setTwoFAEnabled(false);
         toast.warning('Autenticación de Dos Factores desactivada.');
       } catch (error) {
-         toast.error("No se pudo desactivar 2FA.");
+        console.error("Error al desactivar 2FA", error);
+        toast.error("No se pudo desactivar 2FA.");
       }
     }
   };

@@ -8,7 +8,7 @@ import { Alert, AlertDescription } from './ui/alert';
 // Se quita InputOTP, InputOTPGroup, InputOTPSlot
 import { Input } from './ui/input'; // <-- Se añade el Input normal
 // ---
-import { ShieldCheck, AlertCircle, Loader2, ArrowLeft, CheckCircle2 } from 'lucide-react';
+import { ShieldCheck, AlertCircle, Loader2, CheckCircle2 } from 'lucide-react';
 import { toast } from 'sonner';
 import axios from 'axios';
 import { useAuth } from '../contexts/AuthContext';
@@ -18,7 +18,6 @@ export function Activate2FA() {
   const { user } = useAuth();
 
   const [qrCodeBase64, setQrCodeBase64] = useState('');
-  const [secretKey, setSecretKey] = useState('');
   const [otpCode, setOtpCode] = useState('');
   const [isLoadingQr, setIsLoadingQr] = useState(true);
   const [isVerifying, setIsVerifying] = useState(false);
@@ -37,7 +36,6 @@ export function Activate2FA() {
       try {
         const response = await axios.post('/api/auth/2fa/generate-qr', { userId: user.id });
         setQrCodeBase64(response.data.qrCodeBase64);
-        setSecretKey(response.data.secretKey || 'NO-PROVISTA-POR-BACKEND'); 
       } catch (err) {
         console.error("Error al generar QR:", err);
         setQrError('No se pudo generar el código QR. Por favor, recarga la página.');
@@ -117,19 +115,6 @@ export function Activate2FA() {
                       className="w-52 h-52 object-cover rounded-lg"
                     />
                   </div>
-                  <div className="text-center space-y-2">
-                    <p className="text-sm text-muted-foreground">
-                      ¿No puedes escanear el código?
-                    </p>
-                    <div className="flex items-center justify-center gap-2">
-                      <p className="text-xs text-muted-foreground">
-                        Ingresa esta clave manualmente:
-                      </p>
-                      <code className="px-2 py-1 bg-muted rounded text-xs font-mono font-semibold">
-                        {secretKey}
-                      </code>
-                    </div>
-                  </div>
                 </>
               ) : (
                  <div className="w-64 h-64 flex flex-col items-center justify-center bg-muted/50 rounded-lg border-2 border-dashed border-destructive/20">
@@ -208,21 +193,24 @@ export function Activate2FA() {
           </div>
         </CardContent>
 
-        {/* CardFooter (sin cambios) */}
-        <CardFooter className="flex flex-col sm:flex-row gap-3 sm:justify-between pt-6">
+        {/* CardFooter */}
+        <CardFooter className="flex gap-3 justify-between pt-6">
           <Button 
             variant="outline" 
             onClick={handleCancel}
             disabled={isVerifying}
-            className="w-full sm:w-auto"
+            className="flex-1"
           >
-            <ArrowLeft className="mr-2 h-4 w-4" />
             Volver al Perfil
           </Button>
           <Button 
             onClick={handleVerify2FA}
             disabled={otpCode.length !== 6 || isVerifying || isLoadingQr || !qrCodeBase64}
-            className="w-full sm:w-auto min-w-[180px]"
+            className="flex-1"
+            style={{ 
+              backgroundColor: otpCode.length === 6 && !isLoadingQr && !isVerifying ? '#2F4F2F' : undefined,
+              color: otpCode.length === 6 && !isLoadingQr && !isVerifying ? 'white' : undefined
+            }}
           >
             {isVerifying ? (
               <>
@@ -230,10 +218,7 @@ export function Activate2FA() {
                 Verificando...
               </>
             ) : (
-              <>
-                <ShieldCheck className="mr-2 h-4 w-4" />
-                Verificar y Activar
-              </>
+              'Verificar y Activar'
             )}
           </Button>
         </CardFooter>

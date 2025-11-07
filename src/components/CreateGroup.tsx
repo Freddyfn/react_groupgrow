@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -11,6 +11,9 @@ import { RadioGroup, RadioGroupItem } from './ui/radio-group';
 import { Calendar } from './ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 import { CalendarIcon, Users, Target, DollarSign, Clock, ArrowLeft } from 'lucide-react';
+import { toast } from 'sonner@2.0.3';
+import { useAuth } from '../contexts/AuthContext';
+import { groupService } from '../services/groupService';
 
 // Simple date formatter
 const formatDate = (date: Date) => {
@@ -23,51 +26,107 @@ const formatDate = (date: Date) => {
 
 export function CreateGroup() {
   const navigate = useNavigate();
+  const { isAuthenticated, user } = useAuth();
   const [formData, setFormData] = useState({
     groupName: '',
-    groupType: '', // 'investment' or 'saving'
+    groupType: undefined as 'saving' | 'investment' | undefined, // 'investment' or 'saving'
     description: '',
     goal: '',
     targetAmount: '',
     deadline: undefined as Date | undefined,
     maxMembers: '',
-    privacy: '', // 'public' or 'private'
+    privacy: undefined as 'public' | 'private' | undefined, // 'public' or 'private'
     invitationCode: '',
-    contributionFrequency: '', // 'weekly', 'monthly', 'quarterly'
+    contributionFrequency: undefined as string | undefined, // 'weekly', 'monthly', 'quarterly'
     minimumContribution: '',
-    riskLevel: '', // 'low', 'medium', 'high'
-    category: '' // 'education', 'travel', 'emergency', 'retirement', 'business', 'other'
+    riskLevel: undefined as 'low' | 'medium' | 'high' | undefined, // 'low', 'medium', 'high'
+    category: undefined as string | undefined // 'education', 'travel', 'emergency', 'retirement', 'business', 'other'
   });
   const [error, setError] = useState('');
+
+  // Redirigir si no está autenticado
+  useEffect(() => {
+    if (!isAuthenticated) {
+      toast.error('Debes iniciar sesión para crear grupos');
+      navigate('/login');
+    }
+  }, [isAuthenticated, navigate]);
 
   const handleInputChange = (field: string, value: string | Date | undefined) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
 
-    // Validation
-    if (!formData.groupName || !formData.groupType || !formData.goal || !formData.targetAmount) {
-      setError('Por favor completa todos los campos obligatorios');
+    // Verificar autenticación
+    if (!isAuthenticated || !user) {
+      setError('Debes estar autenticado para crear grupos');
+      toast.error('Debes iniciar sesión para crear grupos');
       return;
     }
 
-    if (parseInt(formData.targetAmount) <= 0) {
-      setError('El monto objetivo debe ser mayor a 0');
+    // Validación mejorada con mensajes específicos
+    const missingFields: string[] = [];
+    
+    if (!formData.groupName || formData.groupName.trim() === '') {
+      missingFields.push('Nombre del Grupo');
+    }
+    
+    if (!formData.groupType) {
+      missingFields.push('Tipo de Grupo');
+    }
+    
+    if (!formData.goal || formData.goal.trim() === '') {
+      missingFields.push('Meta Específica');
+    }
+    
+    if (!formData.targetAmount || formData.targetAmount.trim() === '') {
+      missingFields.push('Monto Objetivo');
+    } else {
+      const targetAmountNum = parseFloat(formData.targetAmount);
+      if (isNaN(targetAmountNum) || targetAmountNum <= 0) {
+        setError('El monto objetivo debe ser un número mayor a 0');
+        return;
+      }
+    }
+
+    if (missingFields.length > 0) {
+      setError(`Por favor completa los siguientes campos obligatorios: ${missingFields.join(', ')}`);
       return;
     }
 
-    if (formData.maxMembers && parseInt(formData.maxMembers) < 2) {
+    if (formData.maxMembers && formData.maxMembers.trim() !== '' && parseInt(formData.maxMembers) < 2) {
       setError('El grupo debe tener al menos 2 miembros');
       return;
     }
 
-    // Simulate group creation
-    const groupId = Math.random().toString(36).substr(2, 9);
-    alert(`¡Grupo "${formData.groupName}" creado exitosamente!`);
-    navigate(`/group/${groupId}`);
+    // Crear grupo en el backend
+    try {
+      const createdGroup = await groupService.createGroup({
+        name: formData.groupName.trim(),
+        type: formData.groupType as 'saving' | 'investment',
+        description: formData.description && formData.description.trim() !== '' ? formData.description.trim() : undefined,
+        goal: formData.goal.trim(),
+        targetAmount: parseFloat(formData.targetAmount),
+        deadline: formData.deadline?.toISOString().split('T')[0],
+        maxMembers: formData.maxMembers && formData.maxMembers.trim() !== '' ? parseInt(formData.maxMembers) : undefined,
+        privacy: formData.privacy || 'public',
+        invitationCode: formData.invitationCode?.trim() || undefined,
+        contributionFrequency: formData.contributionFrequency || undefined,
+        minimumContribution: formData.minimumContribution && formData.minimumContribution.trim() !== '' ? parseFloat(formData.minimumContribution) : undefined,
+        riskLevel: formData.riskLevel || undefined,
+        category: formData.category || undefined
+      });
+
+      toast.success(`Grupo "${formData.groupName}" creado exitosamente`);
+      navigate('/my-groups');
+    } catch (error: any) {
+      console.error('Error al crear grupo:', error);
+      setError(error.response?.data?.message || 'Error al crear el grupo');
+      toast.error(error.response?.data?.message || 'Error al crear el grupo');
+    }
   };
 
   const groupCategories = [
@@ -87,11 +146,11 @@ export function CreateGroup() {
         <div className="mb-6">
           <Button 
             variant="ghost" 
-            onClick={() => navigate('/dashboard')}
+            onClick={() => navigate('/my-groups')}
             className="mb-4"
           >
             <ArrowLeft className="mr-2 h-4 w-4" />
-            Volver al Dashboard
+            Volver a Mis Grupos
           </Button>
           
           <Card>
@@ -130,8 +189,8 @@ export function CreateGroup() {
                   <div>
                     <Label>Tipo de Grupo *</Label>
                     <RadioGroup 
-                      value={formData.groupType} 
-                      onValueChange={(value) => handleInputChange('groupType', value)}
+                      value={formData.groupType || ''} 
+                      onValueChange={(value) => handleInputChange('groupType', value as 'saving' | 'investment')}
                       className="flex space-x-6 mt-2"
                     >
                       <div className="flex items-center space-x-2">
@@ -158,7 +217,10 @@ export function CreateGroup() {
 
                   <div>
                     <Label htmlFor="category">Categoría</Label>
-                    <Select onValueChange={(value) => handleInputChange('category', value)}>
+                    <Select 
+                      value={formData.category || undefined}
+                      onValueChange={(value) => handleInputChange('category', value)}
+                    >
                       <SelectTrigger>
                         <SelectValue placeholder="Selecciona una categoría" />
                       </SelectTrigger>
@@ -207,33 +269,36 @@ export function CreateGroup() {
                     </div>
 
                     <div>
-                      <Label>Fecha Límite</Label>
-                      <Popover>
-                        <PopoverTrigger asChild>
-                          <Button
-                            variant="outline"
-                            className="w-full justify-start text-left font-normal"
-                          >
-                            <CalendarIcon className="mr-2 h-4 w-4" />
-                            {formData.deadline ? formatDate(formData.deadline) : "Seleccionar fecha"}
-                          </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0">
-                          <Calendar
-                            mode="single"
-                            selected={formData.deadline}
-                            onSelect={(date) => handleInputChange('deadline', date)}
-                            initialFocus
-                          />
-                        </PopoverContent>
-                      </Popover>
+                      <Label htmlFor="deadline">Fecha Límite</Label>
+                      <div className="relative">
+                        <CalendarIcon className="absolute left-3 top-3 h-4 w-4 text-muted-foreground pointer-events-none" />
+                        <Input
+                          id="deadline"
+                          type="date"
+                          value={formData.deadline ? formData.deadline.toISOString().split('T')[0] : ''}
+                          onChange={(e) => {
+                            const dateValue = e.target.value;
+                            if (dateValue) {
+                              const date = new Date(dateValue);
+                              handleInputChange('deadline', date);
+                            } else {
+                              handleInputChange('deadline', undefined);
+                            }
+                          }}
+                          className="pl-10"
+                          min={new Date().toISOString().split('T')[0]}
+                        />
+                      </div>
                     </div>
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <Label htmlFor="contributionFrequency">Frecuencia de Aportes</Label>
-                      <Select onValueChange={(value) => handleInputChange('contributionFrequency', value)}>
+                      <Select 
+                        value={formData.contributionFrequency || undefined}
+                        onValueChange={(value) => handleInputChange('contributionFrequency', value)}
+                      >
                         <SelectTrigger>
                           <SelectValue placeholder="Seleccionar frecuencia" />
                         </SelectTrigger>
@@ -262,8 +327,8 @@ export function CreateGroup() {
                     <div>
                       <Label>Nivel de Riesgo</Label>
                       <RadioGroup 
-                        value={formData.riskLevel} 
-                        onValueChange={(value) => handleInputChange('riskLevel', value)}
+                        value={formData.riskLevel || ''} 
+                        onValueChange={(value) => handleInputChange('riskLevel', value as 'low' | 'medium' | 'high')}
                         className="flex space-x-6 mt-2"
                       >
                         <div className="flex items-center space-x-2">
@@ -307,8 +372,8 @@ export function CreateGroup() {
                     <div>
                       <Label>Privacidad</Label>
                       <RadioGroup 
-                        value={formData.privacy} 
-                        onValueChange={(value) => handleInputChange('privacy', value)}
+                        value={formData.privacy || ''} 
+                        onValueChange={(value) => handleInputChange('privacy', value as 'public' | 'private')}
                         className="flex space-x-6 mt-2"
                       >
                         <div className="flex items-center space-x-2">
@@ -343,7 +408,7 @@ export function CreateGroup() {
                   <Button 
                     type="button" 
                     variant="outline" 
-                    onClick={() => navigate('/dashboard')}
+                    onClick={() => navigate('/my-groups')}
                     className="flex-1"
                   >
                     Cancelar
