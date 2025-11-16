@@ -114,8 +114,13 @@ export function RegisterPage() {
 
       } else {
         // Error del servidor (ej: email ya existe)
-        const errorMessage = await response.text();
-        setError(errorMessage || 'Error en el registro. Inténtalo de nuevo.');
+        try {
+          const errorData = await response.json();
+          setError(errorData.message || 'Error en el registro. Inténtalo de nuevo.');
+        } catch {
+          const errorMessage = await response.text();
+          setError(errorMessage || 'Error en el registro. Inténtalo de nuevo.');
+        }
       }
     } catch (err) {
       // Error de red
