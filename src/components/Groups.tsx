@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from './ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
@@ -8,19 +8,19 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Label } from './ui/label';
 import { Separator } from './ui/separator';
 import { Users, Target, Lock, Search, UserPlus, Eye, Edit } from 'lucide-react';
-import { toast } from 'sonner@2.0.3';
+import { toast } from 'sonner';
 
-interface PublicGroup {
+interface Group {
   id: string;
   name: string;
-  creator: string;
-  objective: string;
+  description: string;
+  category: string;
+  creatorName: string; 
   currentMembers: number;
   maxMembers: number;
   targetAmount: number;
   currentAmount: number;
-  category: string;
-  isPublic: boolean;
+  isMember: boolean; // Indica si el usuario actual es miembro
 }
 
 export function Groups() {
@@ -28,96 +28,87 @@ export function Groups() {
   const [searchTerm, setSearchTerm] = useState('');
   const [privateGroupCode, setPrivateGroupCode] = useState('');
   const [isJoiningPrivate, setIsJoiningPrivate] = useState(false);
-  
-  // Usuario actual (en una app real vendría del contexto de autenticación)
-  const currentUser = 'María González';
+  const [groups, setGroups] = useState<Group[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  // Mock data para grupos públicos
-  const [publicGroups] = useState<PublicGroup[]>([
-    {
-      id: '1',
-      name: 'Ahorro para Vacaciones 2025',
-      creator: 'María González',
-      objective: 'Ahorrar para unas vacaciones familiares en Europa',
-      currentMembers: 12,
-      maxMembers: 20,
-      targetAmount: 50000,
-      currentAmount: 32500,
-      category: 'Viajes',
-      isPublic: true
-    },
-    {
-      id: '2',
-      name: 'Fondo de Emergencia Grupal',
-      creator: 'Carlos Rodríguez',
-      objective: 'Crear un fondo de emergencia colectivo para situaciones imprevistas',
-      currentMembers: 8,
-      maxMembers: 15,
-      targetAmount: 100000,
-      currentAmount: 67800,
-      category: 'Emergencia',
-      isPublic: true
-    },
-    {
-      id: '3',
-      name: 'Inversión en Criptomonedas',
-      creator: 'Ana Martínez',
-      objective: 'Diversificar portafolio invirtiendo en criptomonedas de forma responsable',
-      currentMembers: 15,
-      maxMembers: 25,
-      targetAmount: 200000,
-      currentAmount: 145000,
-      category: 'Inversiones',
-      isPublic: true
-    },
-    {
-      id: '4',
-      name: 'Compra de Casa Compartida',
-      creator: 'Luis Hernández',
-      objective: 'Ahorrar para el enganche de una propiedad inmobiliaria',
-      currentMembers: 6,
-      maxMembers: 10,
-      targetAmount: 300000,
-      currentAmount: 180000,
-      category: 'Inmuebles',
-      isPublic: true
-    },
-    {
-      id: '5',
-      name: 'Educación y Certificaciones',
-      creator: 'Patricia Silva',
-      objective: 'Financiar cursos y certificaciones profesionales para el equipo',
-      currentMembers: 20,
-      maxMembers: 30,
-      targetAmount: 75000,
-      currentAmount: 52500,
-      category: 'Educación',
-      isPublic: true
-    },
-    {
-      id: '6',
-      name: 'Startup Tech Colaborativa',
-      creator: 'Andrés Torres',
-      objective: 'Reunir capital para lanzar una startup tecnológica innovadora',
-      currentMembers: 18,
-      maxMembers: 25,
-      targetAmount: 500000,
-      currentAmount: 275000,
-      category: 'Emprendimiento',
-      isPublic: true
+  // En una app real, el ID y nombre del usuario vendrían del contexto de autenticación
+  const currentUserId = 1; // Simulación
+  const currentUserName = 'María González'; // Simulación
+
+  const fetchPublicGroupsData = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const headers: HeadersInit = {
+        'Content-Type': 'application/json',
+      };
+      
+      // Si hay token, incluirlo para que el backend pueda verificar membresía
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+
+      const response = await fetch('/api/v1/groups/public', {
+        headers
+      }); 
+      
+      if (!response.ok) {
+        throw new Error('Error al cargar los grupos');
+      }
+      const data = await response.json();
+      setGroups(data);
+    } catch (err: any) {
+      setError(err.message);
+      toast.error('No se pudieron cargar los grupos. Inténtalo de nuevo.');
+    } finally {
+      setLoading(false);
     }
-  ]);
+  };
 
-  const filteredGroups = publicGroups.filter(group =>
+  useEffect(() => {
+    fetchPublicGroupsData();
+  }, []);
+
+  const filteredGroups = groups.filter(group =>
     group.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    group.creator.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    group.objective.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    group.creatorName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    group.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
     group.category.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const handleJoinPublicGroup = (groupId: string) => {
-    toast.success('¡Te has unido al grupo exitosamente!');
-    navigate(`/group/${groupId}`);
+  const handleJoinPublicGroup = async (groupId: string) => {
+    try {
+      const token = localStorage.getItem('token');
+      
+      if (!token) {
+        toast.error('Debes iniciar sesión para unirte a un grupo');
+        navigate('/login');
+        return;
+      }
+
+      const response = await fetch(`/api/v1/groups/${groupId}/join`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(errorText || 'Error al unirse al grupo');
+      }
+
+      toast.success('¡Te has unido al grupo exitosamente!');
+      
+      // Recargar la lista de grupos desde el backend para obtener datos actualizados
+      await fetchPublicGroupsData();
+      
+      // Navegar al dashboard del grupo
+      setTimeout(() => navigate(`/group/${groupId}`), 500);
+    } catch (error: any) {
+      toast.error(error.message || 'No se pudo unir al grupo. Inténtalo de nuevo.');
+    }
   };
 
   const generatePrivateCode = () => {
@@ -165,6 +156,15 @@ export function Groups() {
   const getProgressPercentage = (current: number, target: number) => {
     return Math.min((current / target) * 100, 100);
   };
+  
+  if (loading) {
+    return <div className="flex justify-center items-center h-screen">Cargando grupos...</div>;
+  }
+
+  if (error) {
+    return <div className="flex justify-center items-center h-screen text-red-500">{error}</div>;
+  }
+
 
   return (
     <div className="min-h-screen bg-background py-8">
@@ -286,7 +286,7 @@ export function Groups() {
                         <Users className="h-4 w-4 mr-1" />
                         {group.currentMembers}/{group.maxMembers}
                       </div>
-                      {group.creator === currentUser && (
+                      {group.creatorName === currentUserName && (
                         <Button
                           size="sm"
                           variant="ghost"
@@ -301,14 +301,14 @@ export function Groups() {
                   </div>
                   <CardTitle className="text-lg">{group.name}</CardTitle>
                   <CardDescription className="text-sm">
-                    Creado por <strong>{group.creator}</strong>
+                    Creado por <strong>{group.creatorName}</strong>
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div>
                     <div className="flex items-start gap-2 mb-2">
                       <Target className="h-4 w-4 mt-1 text-primary" />
-                      <p className="text-sm">{group.objective}</p>
+                      <p className="text-sm">{group.description}</p>
                     </div>
                   </div>
                   
@@ -330,13 +330,25 @@ export function Groups() {
                     </p>
                   </div>
 
-                  <Button 
-                    onClick={() => handleJoinPublicGroup(group.id)}
-                    className="w-full"
-                    disabled={group.currentMembers >= group.maxMembers}
-                  >
-                    {group.currentMembers >= group.maxMembers ? 'Grupo Lleno' : 'Unirse al Grupo'}
-                  </Button>
+                  {group.isMember ? (
+                    <Button 
+                      onClick={() => navigate(`/group/${group.id}`)}
+                      className="w-full"
+                      variant="secondary"
+                    >
+                      <Eye className="mr-2 h-4 w-4" />
+                      Ya estás en el Grupo
+                    </Button>
+                  ) : (
+                    <Button 
+                      onClick={() => handleJoinPublicGroup(group.id)}
+                      className="w-full"
+                      disabled={group.currentMembers >= group.maxMembers}
+                    >
+                      <UserPlus className="mr-2 h-4 w-4" />
+                      {group.currentMembers >= group.maxMembers ? 'Grupo Lleno' : 'Unirse al Grupo'}
+                    </Button>
+                  )}
                 </CardContent>
               </Card>
             ))}

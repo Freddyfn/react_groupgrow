@@ -23,19 +23,22 @@ export function Navbar() {
 
   // Filtrar items de navegación según el estado de autenticación
   const getNavigationItems = () => {
-    const baseItems = [
+    if (!isAuthenticated) {
+      // Vistas públicas: solo para usuarios no autenticados
+      return [
+        { label: 'Inicio', href: '/' },
+        { label: 'Grupos', href: '/groups' },
+        { label: 'Recursos', href: '/resources' },
+      ];
+    }
+
+    // Vistas privadas: solo para usuarios autenticados
+    return [
       { label: 'Dashboard', href: '/dashboard' },
       { label: 'Grupos', href: '/groups' },
       { label: 'Mis Grupos', href: '/my-groups' },
       { label: 'Recursos', href: '/resources' },
     ];
-
-    // Agregar "Inicio" solo si NO está autenticado
-    if (!isAuthenticated) {
-      return [{ label: 'Inicio', href: '/' }, ...baseItems];
-    }
-
-    return baseItems;
   };
 
   const navigationItems = getNavigationItems();
@@ -45,7 +48,7 @@ export function Navbar() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between h-16">
           <div className="flex items-center">
-            <Link to="/" className="flex items-center space-x-2">
+            <Link to={isAuthenticated ? "/dashboard" : "/"} className="flex items-center space-x-2">
               <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
                 <span className="text-primary-foreground font-semibold">GG</span>
               </div>

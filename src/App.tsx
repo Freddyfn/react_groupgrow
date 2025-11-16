@@ -1,6 +1,7 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
+import { Home } from './components/Home';
 import { LandingPage } from './components/LandingPage';
 import { LoginPage } from './components/LoginPage';
 import { RegisterPage } from './components/RegisterPage';
@@ -15,6 +16,7 @@ import { Resources } from './components/Resources';
 import { Navbar } from './components/Navbar';
 import { Toaster } from './components/ui/sonner';
 import { Activate2FA } from './components/Activate2FA'; // <-- 1. IMPORTADO
+import { MakePayment } from './components/MakePayment';
 
 export default function App() {
   return (
@@ -37,7 +39,7 @@ export default function App() {
               <Navbar />
               {/* Rutas anidadas que SÍ usan la Navbar */}
               <Routes>
-                <Route path="/" element={<LandingPage />} />
+                <Route path="/" element={<Home />} />
                 <Route path="/login" element={<LoginPage />} />
                 <Route path="/register" element={<RegisterPage />} />
                 <Route path="/dashboard" element={<Dashboard />} />
@@ -46,6 +48,7 @@ export default function App() {
                 <Route path="/my-groups" element={<MyGroups />} />
                 <Route path="/edit-group/:groupId" element={<EditGroup />} />
                 <Route path="/group/:groupId" element={<GroupDashboard />} />
+                <Route path="/make-payment/:groupId" element={<MakePayment />} />
                 <Route path="/profile" element={<Profile />} />
                 <Route path="/resources" element={<Resources />} />
                 {/* Puedes añadir un fallback 404 aquí si es necesario */}

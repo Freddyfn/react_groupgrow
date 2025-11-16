@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
@@ -27,72 +27,145 @@ import {
   Bot,
   AlertCircle
 } from 'lucide-react';
+import { toast } from 'sonner';
+import { useAuth } from '../contexts/AuthContext';
+import { MarkdownFormatter } from './MarkdownFormatter';
+
+// Interfaces para tipado
+interface DashboardStats {
+  totalSaved: number;
+  totalInvested: number;
+  monthlyGrowth: number;
+  activeGroups: number;
+  nextPaymentAmount: number;
+  nextPaymentDays: number;
+}
+
+interface PerformanceDataPoint {
+  month: string;
+  amount: number;
+}
+
+interface PortfolioItem {
+  name: string;
+  value: number;
+  color: string;
+}
+
+interface UserGroup {
+  id: number;
+  name: string;
+  members: number;
+  target: number;
+  current: number;
+  monthlyContribution: number;
+  deadline: string;
+  status: string;
+}
+
+interface DashboardData {
+  stats: DashboardStats;
+  performance: PerformanceDataPoint[];
+  portfolio: PortfolioItem[];
+  groups: UserGroup[];
+  aiTips: string[];
+}
 
 export function Dashboard() {
+  const { user } = useAuth();
   const [showAIAssistant, setShowAIAssistant] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
 
-  // Mock data
-  const personalStats = {
-    totalSaved: 12500,
-    totalInvested: 8500,
-    monthlyGrowth: 8.5,
-    activeGroups: 3
+  useEffect(() => {
+    if (user) {
+      fetchDashboardData();
+    }
+  }, [user]);
+
+  const fetchDashboardData = async () => {
+    if (!user) {
+      setError('No hay usuario logueado');
+      setLoading(false);
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const token = localStorage.getItem('token');
+      const response = await fetch(`/api/v1/dashboard/${user.id}`, {
+        headers: {
+          'Authorization': token ? `Bearer ${token}` : '',
+          'Content-Type': 'application/json'
+        }
+      });
+      if (!response.ok) {
+        throw new Error('Error al cargar los datos del dashboard');
+      }
+      const data: DashboardData = await response.json();
+      setDashboardData(data);
+    } catch (err: any) {
+      setError(err.message);
+      toast.error('No se pudieron cargar tus datos. Inténtalo de nuevo.');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const performanceData = [
-    { month: 'Ene', amount: 5000 },
-    { month: 'Feb', amount: 6200 },
-    { month: 'Mar', amount: 7800 },
-    { month: 'Abr', amount: 9200 },
-    { month: 'May', amount: 10800 },
-    { month: 'Jun', amount: 12500 }
-  ];
+  if (loading) {
+    return (
+      <div className="max-w-7xl mx-auto p-6 flex items-center justify-center min-h-screen">
+        <p className="text-lg text-muted-foreground">Cargando tu dashboard...</p>
+      </div>
+    );
+  }
 
-  const portfolioData = [
-    { name: 'Acciones', value: 45, color: '#8884d8' },
-    { name: 'Bonos', value: 30, color: '#82ca9d' },
-    { name: 'Criptomonedas', value: 15, color: '#ffc658' },
-    { name: 'Efectivo', value: 10, color: '#ff7300' }
-  ];
+  if (error || !dashboardData) {
+    return (
+      <div className="max-w-7xl mx-auto p-6 flex items-center justify-center min-h-screen">
+        <p className="text-lg text-destructive">Error al cargar los datos. Por favor, recarga la página.</p>
+      </div>
+    );
+  }
 
-  const groups = [
-    {
-      id: 1,
-      name: 'Vacaciones Familia 2025',
-      members: 4,
-      target: 10000,
-      current: 6500,
-      monthlyContribution: 500,
-      deadline: '2025-06-01',
-      status: 'active'
-    },
-    {
-      id: 2,
-      name: 'Fondo Emergencia Amigos',
-      members: 6,
-      target: 15000,
-      current: 12000,
-      monthlyContribution: 400,
-      deadline: '2025-12-01',
-      status: 'active'
-    },
-    {
-      id: 3,
-      name: 'Inversión Tech Startup',
-      members: 8,
-      target: 25000,
-      current: 18500,
-      monthlyContribution: 600,
-      deadline: '2026-03-01',
-      status: 'pending_vote'
+  const { stats, performance, portfolio, groups, aiTips } = dashboardData;
+
+  // Calcular el crecimiento de ahorros comparando los últimos dos meses
+  const calculateSavingsGrowth = () => {
+    if (performance.length < 2) return null;
+    const lastMonth = performance[performance.length - 1].amount;
+    const previousMonth = performance[performance.length - 2].amount;
+    
+    if (previousMonth === 0) {
+      return lastMonth > 0 ? '+100' : null;
     }
-  ];
+    
+    const growth = ((lastMonth - previousMonth) / previousMonth) * 100;
+    return growth >= 0 ? `+${growth.toFixed(1)}` : growth.toFixed(1);
+  };
 
-  const aiTips = [
-    "Considera aumentar tu aporte mensual en un 5% para acelerar tus objetivos",
-    "Tus grupos están rindiendo bien, pero 'Inversión Tech Startup' necesita tu voto",
-    "Es un buen momento para diversificar: considera invertir en bonos verdes"
-  ];
+  // Calcular cuántos grupos necesitan atención
+  const calculateGroupsNeedingAttention = () => {
+    if (groups.length === 0) return 0;
+    
+    const now = new Date();
+    const sevenDaysFromNow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+    
+    return groups.filter(group => {
+      // Grupos con voto pendiente
+      if (group.status === 'pending_vote') return true;
+      
+      // Grupos con deadline cercano (menos de 7 días)
+      const deadline = new Date(group.deadline);
+      if (deadline <= sevenDaysFromNow && deadline >= now) return true;
+      
+      return false;
+    }).length;
+  };
+
+  const savingsGrowth = calculateSavingsGrowth();
+  const groupsNeedingAttention = calculateGroupsNeedingAttention();
 
   return (
     <div className="max-w-7xl mx-auto p-6 space-y-8">
@@ -120,9 +193,13 @@ export function Dashboard() {
             <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl">${personalStats.totalSaved.toLocaleString()}</div>
+            <div className="text-2xl">${stats.totalSaved.toLocaleString()}</div>
             <p className="text-xs text-muted-foreground">
-              +12% desde el mes pasado
+              {savingsGrowth !== null 
+                ? `${savingsGrowth}% desde el mes pasado`
+                : stats.totalSaved > 0 
+                  ? 'Comienza tu historial de ahorro'
+                  : 'Aún no has realizado ahorros'}
             </p>
           </CardContent>
         </Card>
@@ -133,9 +210,13 @@ export function Dashboard() {
             <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl">${personalStats.totalInvested.toLocaleString()}</div>
+            <div className="text-2xl">${stats.totalInvested.toLocaleString()}</div>
             <p className="text-xs text-muted-foreground">
-              +{personalStats.monthlyGrowth}% este mes
+              {stats.monthlyGrowth !== 0 
+                ? `${stats.monthlyGrowth >= 0 ? '+' : ''}${stats.monthlyGrowth.toFixed(1)}% este mes`
+                : stats.totalInvested > 0
+                  ? 'Sin cambios este mes'
+                  : 'Aún no has realizado inversiones'}
             </p>
           </CardContent>
         </Card>
@@ -146,9 +227,13 @@ export function Dashboard() {
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl">{personalStats.activeGroups}</div>
+            <div className="text-2xl">{stats.activeGroups}</div>
             <p className="text-xs text-muted-foreground">
-              2 necesitan tu atención
+              {groupsNeedingAttention > 0
+                ? `${groupsNeedingAttention} ${groupsNeedingAttention === 1 ? 'necesita' : 'necesitan'} tu atención`
+                : stats.activeGroups > 0
+                  ? 'Todos tus grupos están al día'
+                  : 'Únete o crea un grupo para empezar'}
             </p>
           </CardContent>
         </Card>
@@ -159,9 +244,17 @@ export function Dashboard() {
             <Calendar className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl">$1,500</div>
+            <div className="text-2xl">
+              {stats.nextPaymentAmount > 0 
+                ? `$${stats.nextPaymentAmount.toLocaleString()}`
+                : '$0'}
+            </div>
             <p className="text-xs text-muted-foreground">
-              En 5 días
+              {stats.nextPaymentAmount > 0 && stats.nextPaymentDays > 0
+                ? `En ${stats.nextPaymentDays} ${stats.nextPaymentDays === 1 ? 'día' : 'días'}`
+                : stats.nextPaymentAmount > 0 && stats.nextPaymentDays === 0
+                  ? 'Vence hoy'
+                  : 'No hay pagos pendientes'}
             </p>
           </CardContent>
         </Card>
@@ -178,7 +271,7 @@ export function Dashboard() {
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={300}>
-              <LineChart data={performanceData}>
+              <LineChart data={performance}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="month" />
                 <YAxis />
@@ -202,35 +295,45 @@ export function Dashboard() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
-              <PieChart>
-                <Pie
-                  data={portfolioData}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={60}
-                  outerRadius={100}
-                  paddingAngle={5}
-                  dataKey="value"
-                >
-                  {portfolioData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} />
+            {portfolio && portfolio.length > 0 ? (
+              <>
+                <ResponsiveContainer width="100%" height={300}>
+                  <PieChart>
+                    <Pie
+                      data={portfolio}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={60}
+                      outerRadius={100}
+                      paddingAngle={5}
+                      dataKey="value"
+                      label={({ name, value }) => `${name}: ${value}%`}
+                      labelLine={true}
+                    >
+                      {portfolio.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip formatter={(value) => `${value}%`} />
+                  </PieChart>
+                </ResponsiveContainer>
+                <div className="grid grid-cols-2 gap-2 mt-4">
+                  {portfolio.map((item, index) => (
+                    <div key={index} className="flex items-center">
+                      <div 
+                        className="w-3 h-3 rounded-full mr-2"
+                        style={{ backgroundColor: item.color }}
+                      />
+                      <span className="text-sm">{item.name}: {item.value}%</span>
+                    </div>
                   ))}
-                </Pie>
-                <Tooltip formatter={(value) => `${value}%`} />
-              </PieChart>
-            </ResponsiveContainer>
-            <div className="grid grid-cols-2 gap-2 mt-4">
-              {portfolioData.map((item, index) => (
-                <div key={index} className="flex items-center">
-                  <div 
-                    className="w-3 h-3 rounded-full mr-2"
-                    style={{ backgroundColor: item.color }}
-                  />
-                  <span className="text-sm">{item.name}: {item.value}%</span>
                 </div>
-              ))}
-            </div>
+              </>
+            ) : (
+              <div className="flex items-center justify-center h-[300px] text-muted-foreground">
+                No hay datos de portfolio disponibles
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -244,52 +347,58 @@ export function Dashboard() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          {groups.map((group) => (
-            <div key={group.id} className="border rounded-lg p-4 hover:bg-muted/50 transition-colors">
-              <div className="flex justify-between items-start mb-3">
-                <div>
-                  <h3 className="font-semibold">{group.name}</h3>
-                  <div className="flex items-center text-sm text-muted-foreground mt-1">
-                    <Users className="w-4 h-4 mr-1" />
-                    {group.members} miembros
-                    <Target className="w-4 h-4 mr-1 ml-3" />
-                    Meta: ${group.target.toLocaleString()}
+          {groups.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">
+              No tienes grupos todavía. ¡Crea uno para empezar!
+            </div>
+          ) : (
+            groups.map((group) => (
+              <div key={group.id} className="border rounded-lg p-4 hover:bg-muted/50 transition-colors">
+                <div className="flex justify-between items-start mb-3">
+                  <div>
+                    <h3 className="font-semibold">{group.name}</h3>
+                    <div className="flex items-center text-sm text-muted-foreground mt-1">
+                      <Users className="w-4 h-4 mr-1" />
+                      {group.members} miembros
+                      <Target className="w-4 h-4 mr-1 ml-3" />
+                      Meta: ${group.target.toLocaleString()}
+                    </div>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    {group.status === 'pending_vote' && (
+                      <Badge variant="destructive">
+                        <AlertCircle className="w-3 h-3 mr-1" />
+                        Voto Pendiente
+                      </Badge>
+                    )}
+                    <Badge variant={group.status === 'active' ? 'default' : 'secondary'}>
+                      {group.status === 'active' ? 'Activo' : 'Pendiente'}
+                    </Badge>
                   </div>
                 </div>
-                <div className="flex items-center space-x-2">
-                  {group.status === 'pending_vote' && (
-                    <Badge variant="destructive">
-                      <AlertCircle className="w-3 h-3 mr-1" />
-                      Voto Pendiente
-                    </Badge>
-                  )}
-                  <Badge variant={group.status === 'active' ? 'default' : 'secondary'}>
-                    {group.status === 'active' ? 'Activo' : 'Pendiente'}
-                  </Badge>
-                </div>
-              </div>
 
-              <div className="space-y-2">
-                <div className="flex justify-between text-sm">
-                  <span>Progreso: ${group.current.toLocaleString()}</span>
-                  <span>{Math.round((group.current / group.target) * 100)}%</span>
+                <div className="space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span>Progreso: ${group.current.toLocaleString()}</span>
+                    <span>{Math.round((group.current / group.target) * 100)}%</span>
+                  </div>
+                  <Progress value={(group.current / group.target) * 100} />
+                  <div className="flex justify-between text-sm text-muted-foreground">
+                    <span>Aporte mensual: ${group.monthlyContribution}</span>
+                    <span>Vence: {new Date(group.deadline).toLocaleDateString()}</span>
+                  </div>
                 </div>
-                <Progress value={(group.current / group.target) * 100} />
-                <div className="flex justify-between text-sm text-muted-foreground">
-                  <span>Aporte mensual: ${group.monthlyContribution}</span>
-                  <span>Vence: {new Date(group.deadline).toLocaleDateString()}</span>
-                </div>
-              </div>
 
-              <div className="flex justify-end mt-3">
-                <Button variant="outline" asChild>
-                  <Link to={`/group/${group.id}`}>
-                    Ver Detalles
-                  </Link>
-                </Button>
+                <div className="flex justify-end mt-3">
+                  <Button variant="outline" asChild>
+                    <Link to={`/group/${group.id}`}>
+                      Ver Detalles
+                    </Link>
+                  </Button>
+                </div>
               </div>
-            </div>
-          ))}
+            ))
+          )}
         </CardContent>
       </Card>
 
@@ -319,7 +428,9 @@ export function Dashboard() {
               {aiTips.map((tip, index) => (
                 <div key={index} className="flex items-start p-3 bg-muted/50 rounded-lg">
                   <Bot className="w-4 h-4 mr-2 mt-0.5 text-primary flex-shrink-0" />
-                  <p className="text-sm">{tip}</p>
+                  <div className="flex-1">
+                    <MarkdownFormatter text={tip} />
+                  </div>
                 </div>
               ))}
             </div>

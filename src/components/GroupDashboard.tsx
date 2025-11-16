@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
+import { Input } from './ui/input';
 import { Progress } from './ui/progress';
 import { Badge } from './ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
@@ -38,56 +39,113 @@ import {
   Lock,
   Unlock
 } from 'lucide-react';
+import { toast } from 'sonner';
+import { MarkdownFormatter } from './MarkdownFormatter';
+
+// Interfaces
+interface Member {
+  id: number;
+  name: string;
+  avatar: string;
+  contribution: number;
+  status: string;
+}
+
+interface PerformanceData {
+  month: string;
+  amount: number;
+  target: number;
+}
+
+interface Transaction {
+  id: number;
+  type: string;
+  amount: number;
+  member?: string;
+  description?: string;
+  date: string;
+  status: string;
+}
+
+interface ActiveVoting {
+  id: number;
+  title: string;
+  description: string;
+  amount: number;
+  votesFor: number;
+  votesAgainst: number;
+  totalMembers: number;
+  deadline: string;
+  details: string;
+}
+
+interface GroupData {
+  id: string;
+  name: string;
+  description: string;
+  type: string;
+  target: number;
+  current: number;
+  monthlyContribution: number;
+  deadline: string;
+  investmentTerm?: string;
+  status: string;
+  userContribution: number;
+  userProfits: number;
+  totalProfits: number;
+  members: Member[];
+  performance: PerformanceData[];
+  transactions: Transaction[];
+  activeVoting?: ActiveVoting | null;
+}
 
 export function GroupDashboard() {
   const { groupId } = useParams();
+  const navigate = useNavigate();
   const [timeLeft, setTimeLeft] = useState({ days: 15, hours: 8, minutes: 42 });
   const [showVotingModal, setShowVotingModal] = useState(false);
   const [showWithdrawDialog, setShowWithdrawDialog] = useState(false);
   const [withdrawType, setWithdrawType] = useState<'savings' | 'profits'>('savings');
+  const [groupData, setGroupData] = useState<GroupData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [aiQuestion, setAiQuestion] = useState('');
+  const [aiAnswer, setAiAnswer] = useState('');
+  const [aiLoading, setAiLoading] = useState(false);
 
-  // Mock data for the group
-  const groupData = {
-    id: groupId,
-    name: 'Vacaciones Familia 2025',
-    description: 'Ahorro grupal para unas vacaciones familiares increíbles',
-    type: 'investment', // 'savings' or 'investment'
-    target: 10000,
-    current: 6500,
-    monthlyContribution: 500,
-    deadline: '2025-06-01',
-    investmentTerm: '2025-04-01', // Fecha hasta la cual está bloqueada la inversión
-    status: 'active',
-    userContribution: 1750, // Contribución del usuario actual
-    userProfits: 125, // Ganancias del usuario actual (solo para inversiones)
-    totalProfits: 450, // Ganancias totales del grupo
-    members: [
-      { id: 1, name: 'María García', avatar: '', contribution: 1800, status: 'current' },
-      { id: 2, name: 'Carlos López', avatar: '', contribution: 1600, status: 'current' },
-      { id: 3, name: 'Ana Martínez', avatar: '', contribution: 1750, status: 'late' },
-      { id: 4, name: 'Pedro Silva', avatar: '', contribution: 1350, status: 'current' }
-    ],
-    performance: [
-      { month: 'Ene', amount: 2000, target: 1600 },
-      { month: 'Feb', amount: 4200, target: 3200 },
-      { month: 'Mar', amount: 6500, target: 4800 },
-      { month: 'Abr', amount: 6500, target: 6400 },
-    ],
-    transactions: [
-      { id: 1, type: 'contribution', amount: 500, member: 'María García', date: '2024-03-15', status: 'completed' },
-      { id: 2, type: 'contribution', amount: 400, member: 'Carlos López', date: '2024-03-14', status: 'completed' },
-      { id: 3, type: 'investment', amount: 2000, description: 'Fondo de inversión ETF', date: '2024-03-10', status: 'pending_vote' },
-    ],
-    activeVoting: {
-      id: 1,
-      title: 'Inversión en ETF Tecnológico',
-      description: 'Propuesta para invertir $2,000 en un ETF de empresas tecnológicas',
-      amount: 2000,
-      votesFor: 2,
-      votesAgainst: 0,
-      totalMembers: 4,
-      deadline: '2024-03-20',
-      details: 'Este ETF ha mostrado un rendimiento del 12% anual en los últimos 3 años'
+  useEffect(() => {
+    fetchGroupData();
+  }, [groupId]);
+
+  const fetchGroupData = async () => {
+    if (!groupId) return;
+    try {
+      setLoading(true);
+      const token = localStorage.getItem('token');
+      
+      if (!token) {
+        toast.error('Debes iniciar sesión para ver el grupo');
+        navigate('/login');
+        return;
+      }
+
+      const response = await fetch(`/api/v1/groups/${groupId}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error('Error al cargar los datos del grupo');
+      }
+      const data: GroupData = await response.json();
+      setGroupData(data);
+    } catch (err: any) {
+      setError(err.message);
+      toast.error('Error al cargar los datos del grupo.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -115,7 +173,7 @@ export function GroupDashboard() {
   };
 
   const handlePayment = () => {
-    alert('Redirigiendo a PayPal para realizar el pago...');
+    navigate(`/make-payment/${groupId}`);
   };
 
   const downloadReport = (format: string) => {
@@ -124,7 +182,9 @@ export function GroupDashboard() {
 
   // Verificar si se puede retirar la inversión (después del plazo)
   const canWithdrawInvestment = () => {
+    if (!groupData) return false;
     if (groupData.type === 'savings') return true;
+    if (!groupData.investmentTerm) return false;
     const currentDate = new Date();
     const termDate = new Date(groupData.investmentTerm);
     return currentDate >= termDate;
@@ -136,6 +196,7 @@ export function GroupDashboard() {
   };
 
   const confirmWithdraw = () => {
+    if (!groupData) return;
     if (withdrawType === 'savings') {
       alert(`Retirando tu ${groupData.type === 'savings' ? 'ahorro' : 'inversión'}: ${groupData.userContribution.toLocaleString()}`);
     } else {
@@ -143,6 +204,52 @@ export function GroupDashboard() {
     }
     setShowWithdrawDialog(false);
   };
+
+  const askAI = async () => {
+    if (!aiQuestion.trim() || !groupId) return;
+    
+    setAiLoading(true);
+    try {
+      const token = localStorage.getItem('token');
+      
+      const response = await fetch(`/api/v1/ai/ask/group/${groupId}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': token ? `Bearer ${token}` : '',
+        },
+        body: JSON.stringify({ question: aiQuestion })
+      });
+
+      if (!response.ok) {
+        throw new Error('Error al consultar al asistente IA');
+      }
+
+      const data = await response.json();
+      setAiAnswer(data.answer || 'No se pudo obtener una respuesta');
+      setAiQuestion(''); // Limpiar la pregunta
+    } catch (error: any) {
+      setAiAnswer('Error: ' + (error.message || 'No se pudo conectar con el asistente IA'));
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="max-w-7xl mx-auto p-6 flex items-center justify-center min-h-screen">
+        <p className="text-lg text-muted-foreground">Cargando datos del grupo...</p>
+      </div>
+    );
+  }
+
+  if (error || !groupData) {
+    return (
+      <div className="max-w-7xl mx-auto p-6 flex items-center justify-center min-h-screen">
+        <p className="text-lg text-destructive">Error al cargar los datos del grupo.</p>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-7xl mx-auto p-6 space-y-8">
@@ -231,7 +338,7 @@ export function GroupDashboard() {
           <CardContent>
             <div className="text-2xl">{groupData.members.length}</div>
             <p className="text-xs text-muted-foreground">
-              1 con retraso en pago
+              {groupData.members.filter(m => m.status === 'late').length} con retraso en pago
             </p>
           </CardContent>
         </Card>
@@ -304,7 +411,7 @@ export function GroupDashboard() {
                 )}
               </div>
               
-              {groupData.type === 'investment' && !canWithdrawInvestment() && (
+              {groupData.type === 'investment' && !canWithdrawInvestment() && groupData.investmentTerm && (
                 <Alert className="mb-3 border-yellow-200 bg-yellow-50">
                   <Clock className="h-4 w-4" />
                   <AlertDescription className="text-sm">
@@ -618,57 +725,85 @@ export function GroupDashboard() {
             <CardHeader>
               <CardTitle className="flex items-center">
                 <Bot className="w-5 h-5 mr-2 text-primary" />
-                Asistente IA del Grupo
+                Asistente IA "Gro"
               </CardTitle>
               <CardDescription>
-                Recomendaciones y análisis personalizados para tu grupo
+                Pregúntale a Gro sobre el progreso del grupo y sus miembros
               </CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                  <div className="flex items-start space-x-3">
-                    <Bot className="w-5 h-5 text-blue-600 mt-0.5" />
-                    <div>
-                      <p className="font-medium text-blue-900">Análisis de Rendimiento</p>
-                      <p className="text-sm text-blue-700">
-                        Tu grupo está 8% por encima de la meta mensual. Excelente trabajo manteniendo la disciplina de ahorro.
-                      </p>
-                    </div>
-                  </div>
+                {/* Chat input */}
+                <div className="flex space-x-2">
+                  <Input
+                    placeholder="Ej: ¿Cómo va el grupo? ¿Quién está atrasado en pagos?"
+                    value={aiQuestion}
+                    onChange={(e) => setAiQuestion(e.target.value)}
+                    onKeyPress={(e) => e.key === 'Enter' && askAI()}
+                    disabled={aiLoading}
+                  />
+                  <Button onClick={askAI} disabled={aiLoading || !aiQuestion.trim()}>
+                    {aiLoading ? 'Pensando...' : 'Preguntar'}
+                  </Button>
                 </div>
 
-                <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-                  <div className="flex items-start space-x-3">
-                    <Bot className="w-5 h-5 text-yellow-600 mt-0.5" />
-                    <div>
-                      <p className="font-medium text-yellow-900">Recomendación de Inversión</p>
-                      <p className="text-sm text-yellow-700">
-                        Considera diversificar el 30% de tus ahorros en bonos gubernamentales para reducir el riesgo.
-                      </p>
+                {/* AI Response */}
+                {aiAnswer && (
+                  <div className="p-4 bg-primary/5 border border-primary/20 rounded-lg">
+                    <div className="flex items-start space-x-3">
+                      <Bot className="w-5 h-5 text-primary mt-0.5 flex-shrink-0" />
+                      <div className="flex-1">
+                        <p className="font-medium text-primary mb-3">Gro responde:</p>
+                        <MarkdownFormatter text={aiAnswer} />
+                      </div>
                     </div>
                   </div>
+                )}
+
+                {/* Suggestions */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-4">
+                  <button 
+                    onClick={() => { setAiQuestion('¿Cómo va el progreso del grupo?'); }}
+                    className="p-3 text-left text-sm border rounded-lg hover:bg-accent transition-colors"
+                  >
+                    <p className="font-medium">💰 Progreso del Grupo</p>
+                    <p className="text-xs text-muted-foreground">Ver cómo va el avance general</p>
+                  </button>
+                  <button 
+                    onClick={() => { setAiQuestion('¿Quién está atrasado en los pagos?'); }}
+                    className="p-3 text-left text-sm border rounded-lg hover:bg-accent transition-colors"
+                  >
+                    <p className="font-medium">⏰ Estado de Miembros</p>
+                    <p className="text-xs text-muted-foreground">Ver quién necesita pagar</p>
+                  </button>
+                  <button 
+                    onClick={() => { setAiQuestion('¿Cuánto ha aportado cada miembro?'); }}
+                    className="p-3 text-left text-sm border rounded-lg hover:bg-accent transition-colors"
+                  >
+                    <p className="font-medium">📊 Aportes por Miembro</p>
+                    <p className="text-xs text-muted-foreground">Ver contribuciones individuales</p>
+                  </button>
+                  <button 
+                    onClick={() => { setAiQuestion('¿Cuándo alcanzaremos la meta?'); }}
+                    className="p-3 text-left text-sm border rounded-lg hover:bg-accent transition-colors"
+                  >
+                    <p className="font-medium">🎯 Proyección</p>
+                    <p className="text-xs text-muted-foreground">Estimar cuándo llegar a la meta</p>
+                  </button>
                 </div>
 
-                <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
+                {/* Informative cards */}
+                <div className="mt-6 p-4 bg-red-50 border border-red-200 rounded-lg">
                   <div className="flex items-start space-x-3">
-                    <Bot className="w-5 h-5 text-green-600 mt-0.5" />
+                    <AlertCircle className="w-5 h-5 text-red-600 mt-0.5" />
                     <div>
-                      <p className="font-medium text-green-900">Motivación</p>
-                      <p className="text-sm text-green-700">
-                        ¡Increíble! A este ritmo alcanzarán su meta 2 meses antes de lo planeado. Mantengan el momentum.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
-                  <div className="flex items-start space-x-3">
-                    <Bot className="w-5 h-5 text-red-600 mt-0.5" />
-                    <div>
-                      <p className="font-medium text-red-900">Alerta</p>
+                      <p className="font-medium text-red-900">Estado de Pagos</p>
                       <p className="text-sm text-red-700">
-                        Ana Martínez tiene un retraso en su pago. Considera enviarle un recordatorio amistoso.
+                        {groupData.members.filter(m => m.status === 'late').length > 0 ? (
+                          `${groupData.members.filter(m => m.status === 'late').length} miembro(s) tiene(n) retraso en sus pagos.`
+                        ) : (
+                          '✅ Todos los miembros están al día con sus pagos. ¡Excelente trabajo en equipo!'
+                        )}
                       </p>
                     </div>
                   </div>
