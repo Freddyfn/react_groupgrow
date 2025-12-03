@@ -5,24 +5,24 @@ import { Button } from './ui/button';
 import { Progress } from './ui/progress';
 import { Badge } from './ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
-import { 
-  LineChart, 
-  Line, 
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  Tooltip, 
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
   ResponsiveContainer,
   PieChart,
   Pie,
   Cell
 } from 'recharts';
-import { 
-  Plus, 
-  TrendingUp, 
-  Users, 
-  Target, 
-  DollarSign, 
+import {
+  Plus,
+  TrendingUp,
+  Users,
+  Target,
+  DollarSign,
   Calendar,
   Bot,
   AlertCircle
@@ -93,7 +93,8 @@ export function Dashboard() {
 
     try {
       setLoading(true);
-      const token = localStorage.getItem('token');
+      // Buscar token en ambos almacenamientos (Remember Me usa localStorage, sin Remember Me usa sessionStorage)
+      const token = localStorage.getItem('token') || sessionStorage.getItem('token');
       const response = await fetch(`/api/v1/dashboard/${user.id}`, {
         headers: {
           'Authorization': token ? `Bearer ${token}` : '',
@@ -136,11 +137,11 @@ export function Dashboard() {
     if (performance.length < 2) return null;
     const lastMonth = performance[performance.length - 1].amount;
     const previousMonth = performance[performance.length - 2].amount;
-    
+
     if (previousMonth === 0) {
       return lastMonth > 0 ? '+100' : null;
     }
-    
+
     const growth = ((lastMonth - previousMonth) / previousMonth) * 100;
     return growth >= 0 ? `+${growth.toFixed(1)}` : growth.toFixed(1);
   };
@@ -148,18 +149,18 @@ export function Dashboard() {
   // Calcular cuántos grupos necesitan atención
   const calculateGroupsNeedingAttention = () => {
     if (groups.length === 0) return 0;
-    
+
     const now = new Date();
     const sevenDaysFromNow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
-    
+
     return groups.filter(group => {
       // Grupos con voto pendiente
       if (group.status === 'pending_vote') return true;
-      
+
       // Grupos con deadline cercano (menos de 7 días)
       const deadline = new Date(group.deadline);
       if (deadline <= sevenDaysFromNow && deadline >= now) return true;
-      
+
       return false;
     }).length;
   };
@@ -195,9 +196,9 @@ export function Dashboard() {
           <CardContent>
             <div className="text-2xl">${stats.totalSaved.toLocaleString()}</div>
             <p className="text-xs text-muted-foreground">
-              {savingsGrowth !== null 
+              {savingsGrowth !== null
                 ? `${savingsGrowth}% desde el mes pasado`
-                : stats.totalSaved > 0 
+                : stats.totalSaved > 0
                   ? 'Comienza tu historial de ahorro'
                   : 'Aún no has realizado ahorros'}
             </p>
@@ -212,7 +213,7 @@ export function Dashboard() {
           <CardContent>
             <div className="text-2xl">${stats.totalInvested.toLocaleString()}</div>
             <p className="text-xs text-muted-foreground">
-              {stats.monthlyGrowth !== 0 
+              {stats.monthlyGrowth !== 0
                 ? `${stats.monthlyGrowth >= 0 ? '+' : ''}${stats.monthlyGrowth.toFixed(1)}% este mes`
                 : stats.totalInvested > 0
                   ? 'Sin cambios este mes'
@@ -245,7 +246,7 @@ export function Dashboard() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl">
-              {stats.nextPaymentAmount > 0 
+              {stats.nextPaymentAmount > 0
                 ? `$${stats.nextPaymentAmount.toLocaleString()}`
                 : '$0'}
             </div>
@@ -276,10 +277,10 @@ export function Dashboard() {
                 <XAxis dataKey="month" />
                 <YAxis />
                 <Tooltip formatter={(value) => `$${value.toLocaleString()}`} />
-                <Line 
-                  type="monotone" 
-                  dataKey="amount" 
-                  stroke="hsl(var(--primary))" 
+                <Line
+                  type="monotone"
+                  dataKey="amount"
+                  stroke="hsl(var(--primary))"
                   strokeWidth={2}
                 />
               </LineChart>
@@ -320,7 +321,7 @@ export function Dashboard() {
                 <div className="grid grid-cols-2 gap-2 mt-4">
                   {portfolio.map((item, index) => (
                     <div key={index} className="flex items-center">
-                      <div 
+                      <div
                         className="w-3 h-3 rounded-full mr-2"
                         style={{ backgroundColor: item.color }}
                       />
@@ -410,8 +411,8 @@ export function Dashboard() {
               <Bot className="w-5 h-5 mr-2 text-primary" />
               <CardTitle>Asistente IA</CardTitle>
             </div>
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               size="sm"
               onClick={() => setShowAIAssistant(!showAIAssistant)}
             >

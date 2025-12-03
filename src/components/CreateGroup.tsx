@@ -11,7 +11,7 @@ import { RadioGroup, RadioGroupItem } from './ui/radio-group';
 import { Calendar } from './ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 import { CalendarIcon, Users, Target, DollarSign, Clock, ArrowLeft } from 'lucide-react';
-import { toast } from 'sonner@2.0.3';
+import { toast } from 'sonner';
 import { useAuth } from '../contexts/AuthContext';
 import { groupService } from '../services/groupService';
 
@@ -36,7 +36,6 @@ export function CreateGroup() {
     deadline: undefined as Date | undefined,
     maxMembers: '',
     privacy: undefined as 'public' | 'private' | undefined, // 'public' or 'private'
-    invitationCode: '',
     contributionFrequency: undefined as string | undefined, // 'weekly', 'monthly', 'quarterly'
     minimumContribution: '',
     riskLevel: undefined as 'low' | 'medium' | 'high' | undefined, // 'low', 'medium', 'high'
@@ -69,19 +68,19 @@ export function CreateGroup() {
 
     // Validación mejorada con mensajes específicos
     const missingFields: string[] = [];
-    
+
     if (!formData.groupName || formData.groupName.trim() === '') {
       missingFields.push('Nombre del Grupo');
     }
-    
+
     if (!formData.groupType) {
       missingFields.push('Tipo de Grupo');
     }
-    
+
     if (!formData.goal || formData.goal.trim() === '') {
       missingFields.push('Meta Específica');
     }
-    
+
     if (!formData.targetAmount || formData.targetAmount.trim() === '') {
       missingFields.push('Monto Objetivo');
     } else {
@@ -113,7 +112,6 @@ export function CreateGroup() {
         deadline: formData.deadline?.toISOString().split('T')[0],
         maxMembers: formData.maxMembers && formData.maxMembers.trim() !== '' ? parseInt(formData.maxMembers) : undefined,
         privacy: formData.privacy || 'public',
-        invitationCode: formData.invitationCode?.trim() || undefined,
         contributionFrequency: formData.contributionFrequency || undefined,
         minimumContribution: formData.minimumContribution && formData.minimumContribution.trim() !== '' ? parseFloat(formData.minimumContribution) : undefined,
         riskLevel: formData.riskLevel || undefined,
@@ -144,15 +142,15 @@ export function CreateGroup() {
     <div className="min-h-screen py-8 px-4 sm:px-6 lg:px-8">
       <div className="max-w-2xl mx-auto">
         <div className="mb-6">
-          <Button 
-            variant="ghost" 
+          <Button
+            variant="ghost"
             onClick={() => navigate('/my-groups')}
             className="mb-4"
           >
             <ArrowLeft className="mr-2 h-4 w-4" />
             Volver a Mis Grupos
           </Button>
-          
+
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -163,7 +161,7 @@ export function CreateGroup() {
                 Define los objetivos y reglas para tu grupo de inversión o ahorro
               </CardDescription>
             </CardHeader>
-            
+
             <CardContent>
               <form onSubmit={handleSubmit} className="space-y-6">
                 {error && (
@@ -175,7 +173,7 @@ export function CreateGroup() {
                 {/* Información Básica */}
                 <div className="space-y-4">
                   <h3 className="text-lg">Información Básica</h3>
-                  
+
                   <div>
                     <Label htmlFor="groupName">Nombre del Grupo *</Label>
                     <Input
@@ -188,8 +186,8 @@ export function CreateGroup() {
 
                   <div>
                     <Label>Tipo de Grupo *</Label>
-                    <RadioGroup 
-                      value={formData.groupType || ''} 
+                    <RadioGroup
+                      value={formData.groupType || ''}
                       onValueChange={(value) => handleInputChange('groupType', value as 'saving' | 'investment')}
                       className="flex space-x-6 mt-2"
                     >
@@ -217,7 +215,7 @@ export function CreateGroup() {
 
                   <div>
                     <Label htmlFor="category">Categoría</Label>
-                    <Select 
+                    <Select
                       value={formData.category || undefined}
                       onValueChange={(value) => handleInputChange('category', value)}
                     >
@@ -241,7 +239,7 @@ export function CreateGroup() {
                     <Target className="h-5 w-5" />
                     Objetivos Financieros
                   </h3>
-                  
+
                   <div>
                     <Label htmlFor="goal">Meta Específica *</Label>
                     <Input
@@ -295,7 +293,7 @@ export function CreateGroup() {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <Label htmlFor="contributionFrequency">Frecuencia de Aportes</Label>
-                      <Select 
+                      <Select
                         value={formData.contributionFrequency || undefined}
                         onValueChange={(value) => handleInputChange('contributionFrequency', value)}
                       >
@@ -326,8 +324,8 @@ export function CreateGroup() {
                   {formData.groupType === 'investment' && (
                     <div>
                       <Label>Nivel de Riesgo</Label>
-                      <RadioGroup 
-                        value={formData.riskLevel || ''} 
+                      <RadioGroup
+                        value={formData.riskLevel || ''}
                         onValueChange={(value) => handleInputChange('riskLevel', value as 'low' | 'medium' | 'high')}
                         className="flex space-x-6 mt-2"
                       >
@@ -354,7 +352,7 @@ export function CreateGroup() {
                     <Users className="h-5 w-5" />
                     Configuración del Grupo
                   </h3>
-                  
+
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <Label htmlFor="maxMembers">Número Máximo de Miembros</Label>
@@ -371,8 +369,8 @@ export function CreateGroup() {
 
                     <div>
                       <Label>Privacidad</Label>
-                      <RadioGroup 
-                        value={formData.privacy || ''} 
+                      <RadioGroup
+                        value={formData.privacy || ''}
                         onValueChange={(value) => handleInputChange('privacy', value as 'public' | 'private')}
                         className="flex space-x-6 mt-2"
                       >
@@ -387,27 +385,15 @@ export function CreateGroup() {
                       </RadioGroup>
                     </div>
                   </div>
-
-                  {formData.privacy === 'private' && (
-                    <div>
-                      <Label htmlFor="invitationCode">Código de Invitación (Opcional)</Label>
-                      <Input
-                        id="invitationCode"
-                        value={formData.invitationCode}
-                        onChange={(e) => handleInputChange('invitationCode', e.target.value)}
-                        placeholder="Ej: VACACIONES2025"
-                      />
-                    </div>
-                  )}
                 </div>
 
                 <div className="flex space-x-4 pt-6">
                   <Button type="submit" className="flex-1">
                     Crear Grupo
                   </Button>
-                  <Button 
-                    type="button" 
-                    variant="outline" 
+                  <Button
+                    type="button"
+                    variant="outline"
                     onClick={() => navigate('/my-groups')}
                     className="flex-1"
                   >

@@ -2,9 +2,9 @@ import axios from 'axios';
 
 const API_BASE_URL = '/api/auth';
 
-// Obtener token del localStorage
+// Obtener token del localStorage o sessionStorage (Remember Me)
 const getAuthToken = () => {
-  return localStorage.getItem('token');
+  return localStorage.getItem('token') || sessionStorage.getItem('token');
 };
 
 // Configurar axios con el token
@@ -63,4 +63,3 @@ export const userService = {
     );
   }
 };
-

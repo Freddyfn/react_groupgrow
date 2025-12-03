@@ -4,18 +4,19 @@ import { Button } from './ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Input } from './ui/input';
 import { Badge } from './ui/badge';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
+
 import { Label } from './ui/label';
 import { Separator } from './ui/separator';
 import { Users, Target, Lock, Search, UserPlus, Eye, Edit } from 'lucide-react';
 import { toast } from 'sonner';
+import { useAuth } from '../contexts/AuthContext';
 
 interface Group {
   id: string;
   name: string;
   description: string;
   category: string;
-  creatorName: string; 
+  creatorName: string;
   currentMembers: number;
   maxMembers: number;
   targetAmount: number;
@@ -31,6 +32,7 @@ export function Groups() {
   const [groups, setGroups] = useState<Group[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const { token } = useAuth();
 
   // En una app real, el ID y nombre del usuario vendrían del contexto de autenticación
   const currentUserId = 1; // Simulación
@@ -38,11 +40,11 @@ export function Groups() {
 
   const fetchPublicGroupsData = async () => {
     try {
-      const token = localStorage.getItem('token');
+
       const headers: HeadersInit = {
         'Content-Type': 'application/json',
       };
-      
+
       // Si hay token, incluirlo para que el backend pueda verificar membresía
       if (token) {
         headers['Authorization'] = `Bearer ${token}`;
@@ -50,8 +52,8 @@ export function Groups() {
 
       const response = await fetch('/api/v1/groups/public', {
         headers
-      }); 
-      
+      });
+
       if (!response.ok) {
         throw new Error('Error al cargar los grupos');
       }
@@ -78,8 +80,8 @@ export function Groups() {
 
   const handleJoinPublicGroup = async (groupId: string) => {
     try {
-      const token = localStorage.getItem('token');
-      
+
+
       if (!token) {
         toast.error('Debes iniciar sesión para unirte a un grupo');
         navigate('/login');
@@ -100,10 +102,10 @@ export function Groups() {
       }
 
       toast.success('¡Te has unido al grupo exitosamente!');
-      
+
       // Recargar la lista de grupos desde el backend para obtener datos actualizados
       await fetchPublicGroupsData();
-      
+
       // Navegar al dashboard del grupo
       setTimeout(() => navigate(`/group/${groupId}`), 500);
     } catch (error: any) {
@@ -120,25 +122,45 @@ export function Groups() {
     return code;
   };
 
-  const handleJoinPrivateGroup = () => {
+  const handleJoinPrivateGroup = async () => {
     if (!privateGroupCode.trim()) {
       toast.error('Por favor ingresa un código válido');
       return;
     }
 
     setIsJoiningPrivate(true);
-    
-    // Simular verificación del código
-    setTimeout(() => {
-      if (privateGroupCode.length === 8) {
-        toast.success('¡Te has unido al grupo privado exitosamente!');
-        navigate(`/group/private-${privateGroupCode}`);
-      } else {
-        toast.error('Código inválido. Verifica e intenta nuevamente.');
+
+    try {
+
+      if (!token) {
+        toast.error('Debes iniciar sesión para unirte a un grupo');
+        navigate('/login');
+        return;
       }
-      setIsJoiningPrivate(false);
+
+      const response = await fetch('/api/v1/groups/join-by-code', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({ invitationCode: privateGroupCode }),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(errorText || 'Error al unirse al grupo');
+      }
+
+      toast.success('¡Te has unido al grupo exitosamente!');
       setPrivateGroupCode('');
-    }, 1500);
+      // Navegar a mis grupos para ver el nuevo grupo
+      navigate('/my-groups');
+    } catch (error: any) {
+      toast.error(error.message || 'Código inválido o error al unirse.');
+    } finally {
+      setIsJoiningPrivate(false);
+    }
   };
 
   const getCategoryColor = (category: string) => {
@@ -156,7 +178,7 @@ export function Groups() {
   const getProgressPercentage = (current: number, target: number) => {
     return Math.min((current / target) * 100, 100);
   };
-  
+
   if (loading) {
     return <div className="flex justify-center items-center h-screen">Cargando grupos...</div>;
   }
@@ -218,47 +240,26 @@ export function Groups() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <Dialog>
-                  <DialogTrigger asChild>
-                    <Button className="w-full" variant="outline">
-                      <UserPlus className="mr-2 h-4 w-4" />
-                      Unirse con Código
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent>
-                    <DialogHeader>
-                      <DialogTitle>Unirse a Grupo Privado</DialogTitle>
-                      <DialogDescription>
-                        Ingresa el código de 8 caracteres que te proporcionó el creador del grupo
-                      </DialogDescription>
-                    </DialogHeader>
-                    <div className="space-y-4">
-                      <div>
-                        <Label htmlFor="private-code">Código de Grupo</Label>
-                        <Input
-                          id="private-code"
-                          placeholder="Ej: ABC123XY"
-                          value={privateGroupCode}
-                          onChange={(e) => setPrivateGroupCode(e.target.value.toUpperCase())}
-                          maxLength={8}
-                          className="uppercase tracking-wider"
-                        />
-                      </div>
-                      <div className="bg-muted p-3 rounded-lg">
-                        <p className="text-sm text-muted-foreground">
-                          <strong>Ejemplo de código:</strong> {generatePrivateCode()}
-                        </p>
-                      </div>
-                      <Button 
-                        onClick={handleJoinPrivateGroup}
-                        disabled={isJoiningPrivate || privateGroupCode.length !== 8}
-                        className="w-full"
-                      >
-                        {isJoiningPrivate ? 'Verificando...' : 'Unirse al Grupo'}
-                      </Button>
-                    </div>
-                  </DialogContent>
-                </Dialog>
+                <div className="space-y-4">
+                  <div>
+                    <Label htmlFor="private-code" className="sr-only">Código de Grupo</Label>
+                    <Input
+                      id="private-code"
+                      placeholder="Ingresa el código"
+                      value={privateGroupCode}
+                      onChange={(e) => setPrivateGroupCode(e.target.value.toUpperCase())}
+                      maxLength={8}
+                      className="uppercase tracking-wider"
+                    />
+                  </div>
+                  <Button
+                    onClick={handleJoinPrivateGroup}
+                    disabled={isJoiningPrivate || !privateGroupCode.trim()}
+                    className="w-full"
+                  >
+                    {isJoiningPrivate ? 'Verificando...' : 'Unirse con Código'}
+                  </Button>
+                </div>
               </CardContent>
             </Card>
           </div>
@@ -272,7 +273,7 @@ export function Groups() {
             <Eye className="h-5 w-5" />
             Grupos Públicos ({filteredGroups.length})
           </h2>
-          
+
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {filteredGroups.map((group) => (
               <Card key={group.id} className="hover:shadow-lg transition-shadow">
@@ -311,7 +312,7 @@ export function Groups() {
                       <p className="text-sm">{group.description}</p>
                     </div>
                   </div>
-                  
+
                   <div className="space-y-2">
                     <div className="flex justify-between text-sm">
                       <span>Progreso</span>
@@ -320,7 +321,7 @@ export function Groups() {
                       </span>
                     </div>
                     <div className="w-full bg-secondary/30 rounded-full h-2">
-                      <div 
+                      <div
                         className="bg-primary h-2 rounded-full transition-all duration-300"
                         style={{ width: `${getProgressPercentage(group.currentAmount, group.targetAmount)}%` }}
                       />
@@ -331,7 +332,7 @@ export function Groups() {
                   </div>
 
                   {group.isMember ? (
-                    <Button 
+                    <Button
                       onClick={() => navigate(`/group/${group.id}`)}
                       className="w-full"
                       variant="secondary"
@@ -340,7 +341,7 @@ export function Groups() {
                       Ya estás en el Grupo
                     </Button>
                   ) : (
-                    <Button 
+                    <Button
                       onClick={() => handleJoinPublicGroup(group.id)}
                       className="w-full"
                       disabled={group.currentMembers >= group.maxMembers}
@@ -361,8 +362,8 @@ export function Groups() {
                 <p>No se encontraron grupos que coincidan con tu búsqueda</p>
                 <p className="text-sm">Intenta con otros términos o explora todas las categorías</p>
               </div>
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 onClick={() => setSearchTerm('')}
                 className="mt-4"
               >

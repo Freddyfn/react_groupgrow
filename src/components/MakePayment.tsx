@@ -6,10 +6,10 @@ import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Badge } from './ui/badge';
 import { Alert, AlertDescription } from './ui/alert';
-import { 
-  ArrowLeft, 
-  CreditCard, 
-  DollarSign, 
+import {
+  ArrowLeft,
+  CreditCard,
+  DollarSign,
   Shield,
   CheckCircle,
   Info
@@ -25,7 +25,7 @@ interface GroupData {
 export function MakePayment() {
   const { groupId } = useParams();
   const navigate = useNavigate();
-  
+
   const [amount, setAmount] = useState('');
   const [cardNumber, setCardNumber] = useState('');
   const [cardName, setCardName] = useState('');
@@ -46,8 +46,9 @@ export function MakePayment() {
   const fetchGroupData = async () => {
     try {
       setLoading(true);
-      const token = localStorage.getItem('token');
-      
+      // Buscar token en ambos almacenamientos (Remember Me usa localStorage, sin Remember Me usa sessionStorage)
+      const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+
       if (!token) {
         toast.error('Debes iniciar sesión para hacer pagos');
         navigate('/login');
@@ -60,7 +61,7 @@ export function MakePayment() {
           'Content-Type': 'application/json'
         }
       });
-      
+
       if (!response.ok) {
         throw new Error('Error al cargar los datos del grupo');
       }
@@ -122,7 +123,7 @@ export function MakePayment() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!amount || parseFloat(amount) <= 0) {
       alert('Por favor ingresa un monto válido');
       return;
@@ -149,10 +150,11 @@ export function MakePayment() {
     }
 
     setIsProcessing(true);
-    
+
     try {
-      const token = localStorage.getItem('token');
-      
+      // Buscar token en ambos almacenamientos (Remember Me usa localStorage, sin Remember Me usa sessionStorage)
+      const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+
       if (!token) {
         toast.error('Debes iniciar sesión para hacer pagos');
         navigate('/login');
@@ -181,11 +183,11 @@ export function MakePayment() {
       }
 
       const result = await response.json();
-      
+
       if (result.status === 'completed') {
         setIsProcessing(false);
         setPaymentSuccess(true);
-        
+
         // Redirect after success
         setTimeout(() => {
           navigate(`/group/${groupId}`);
@@ -279,25 +281,25 @@ export function MakePayment() {
               </div>
 
               <div className="flex flex-wrap gap-2">
-                <Button 
-                  type="button" 
-                  variant="outline" 
+                <Button
+                  type="button"
+                  variant="outline"
                   size="sm"
                   onClick={() => setSuggestedAmount(groupData.monthlyContribution)}
                 >
                   Aporte sugerido: ${groupData.monthlyContribution}
                 </Button>
-                <Button 
-                  type="button" 
-                  variant="outline" 
+                <Button
+                  type="button"
+                  variant="outline"
                   size="sm"
                   onClick={() => setSuggestedAmount(groupData.monthlyContribution / 2)}
                 >
                   ${groupData.monthlyContribution / 2}
                 </Button>
-                <Button 
-                  type="button" 
-                  variant="outline" 
+                <Button
+                  type="button"
+                  variant="outline"
                   size="sm"
                   onClick={() => setSuggestedAmount(groupData.monthlyContribution * 2)}
                 >
@@ -384,9 +386,9 @@ export function MakePayment() {
                   </AlertDescription>
                 </Alert>
 
-                <Button 
-                  type="submit" 
-                  className="w-full" 
+                <Button
+                  type="submit"
+                  className="w-full"
                   disabled={isProcessing}
                 >
                   {isProcessing ? (
@@ -405,7 +407,7 @@ export function MakePayment() {
 
         {/* Card Preview */}
         <div className="space-y-6">
-          <div 
+          <div
             className="rounded-lg shadow-2xl overflow-hidden"
             style={{
               background: 'linear-gradient(135deg, #1e293b 0%, #334155 50%, #0f172a 100%)'
@@ -428,7 +430,7 @@ export function MakePayment() {
 
                 {/* Card Chip */}
                 <div className="flex items-center space-x-4">
-                  <div 
+                  <div
                     className="w-12 h-10 rounded"
                     style={{
                       background: 'linear-gradient(135deg, #facc15 0%, #ca8a04 100%)'
@@ -507,7 +509,7 @@ export function MakePayment() {
           <Alert>
             <Info className="h-4 w-4" />
             <AlertDescription className="text-sm">
-              <strong>Nota:</strong> Esta es una simulación para pruebas. 
+              <strong>Nota:</strong> Esta es una simulación para pruebas.
               En producción se integraría con PayPal o Stripe para procesar pagos reales.
             </AlertDescription>
           </Alert>

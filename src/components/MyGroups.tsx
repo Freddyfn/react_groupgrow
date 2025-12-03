@@ -92,12 +92,12 @@ export function MyGroups() {
 
   const handleDeleteGroup = async (groupId: number, groupName: string) => {
     if (!user) return;
-    
+
     const group = myGroups.find(g => g.id === groupId);
     if (!group) return;
 
     // Verificar que el usuario es el creador
-    if (group.creatorId !== user.id) {
+    if (Number(group.creatorId) !== Number(user.id)) {
       toast.error('No tienes permisos para eliminar este grupo');
       return;
     }
@@ -114,7 +114,7 @@ export function MyGroups() {
   };
 
   const canEditOrDelete = (group: MyGroup) => {
-    return user && group.creatorId === user.id;
+    return user && Number(group.creatorId) === Number(user.id);
   };
 
   const getCategoryColor = (category: string) => {
@@ -171,7 +171,7 @@ export function MyGroups() {
               Administra los grupos que has creado
             </p>
           </div>
-          <Button 
+          <Button
             onClick={() => {
               if (!isAuthenticated) {
                 toast.error('Debes iniciar sesión para crear grupos');
@@ -223,7 +223,7 @@ export function MyGroups() {
                         <p className="text-xs text-muted-foreground mt-1">{group.description}</p>
                       )}
                     </div>
-                    
+
                     <div className="space-y-2">
                       <div className="flex justify-between text-sm">
                         <span>Progreso</span>
@@ -232,7 +232,7 @@ export function MyGroups() {
                         </span>
                       </div>
                       <div className="w-full bg-secondary/30 rounded-full h-2">
-                        <div 
+                        <div
                           className="bg-primary h-2 rounded-full transition-all duration-300"
                           style={{ width: `${getProgressPercentage(group.currentAmount, group.targetAmount)}%` }}
                         />
@@ -244,7 +244,7 @@ export function MyGroups() {
 
                     {/* Action Buttons */}
                     <div className="flex gap-2 pt-2">
-                      <Button 
+                      <Button
                         onClick={() => navigate(`/group/${group.id}`)}
                         variant="outline"
                         className="flex-1"
@@ -255,7 +255,7 @@ export function MyGroups() {
                       </Button>
                       {canModify && (
                         <>
-                          <Button 
+                          <Button
                             onClick={() => navigate(`/edit-group/${group.id}`)}
                             variant="outline"
                             className="flex-1"
@@ -264,7 +264,7 @@ export function MyGroups() {
                             <Edit className="mr-2 h-4 w-4" />
                             Editar
                           </Button>
-                          <Button 
+                          <Button
                             variant="outline"
                             size="sm"
                             className="text-destructive hover:text-destructive"
@@ -287,8 +287,8 @@ export function MyGroups() {
               <p className="mb-2">No has creado ningún grupo todavía</p>
               <p className="text-sm">Crea tu primer grupo para comenzar a ahorrar o invertir de forma colaborativa</p>
             </div>
-            <Button 
-              className="mt-4" 
+            <Button
+              className="mt-4"
               onClick={() => {
                 if (!isAuthenticated) {
                   toast.error('Debes iniciar sesión para crear grupos');

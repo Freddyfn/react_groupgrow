@@ -9,21 +9,21 @@ import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { Alert, AlertDescription } from './ui/alert';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from './ui/alert-dialog';
-import { 
-  LineChart, 
-  Line, 
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  Tooltip, 
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
   ResponsiveContainer,
   BarChart,
   Bar
 } from 'recharts';
-import { 
-  Users, 
-  Target, 
-  DollarSign, 
+import {
+  Users,
+  Target,
+  DollarSign,
   Calendar,
   TrendingUp,
   Vote,
@@ -97,6 +97,8 @@ interface GroupData {
   performance: PerformanceData[];
   transactions: Transaction[];
   activeVoting?: ActiveVoting | null;
+  privacy?: string;
+  invitationCode?: string;
 }
 
 export function GroupDashboard() {
@@ -121,8 +123,9 @@ export function GroupDashboard() {
     if (!groupId) return;
     try {
       setLoading(true);
-      const token = localStorage.getItem('token');
-      
+      // Buscar token en ambos almacenamientos (Remember Me usa localStorage, sin Remember Me usa sessionStorage)
+      const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+
       if (!token) {
         toast.error('Debes iniciar sesión para ver el grupo');
         navigate('/login');
@@ -135,7 +138,7 @@ export function GroupDashboard() {
           'Content-Type': 'application/json'
         }
       });
-      
+
       if (!response.ok) {
         throw new Error('Error al cargar los datos del grupo');
       }
@@ -207,11 +210,12 @@ export function GroupDashboard() {
 
   const askAI = async () => {
     if (!aiQuestion.trim() || !groupId) return;
-    
+
     setAiLoading(true);
     try {
-      const token = localStorage.getItem('token');
-      
+      // Buscar token en ambos almacenamientos (Remember Me usa localStorage, sin Remember Me usa sessionStorage)
+      const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+
       const response = await fetch(`/api/v1/ai/ask/group/${groupId}`, {
         method: 'POST',
         headers: {
@@ -256,8 +260,41 @@ export function GroupDashboard() {
       {/* Header */}
       <div className="flex justify-between items-start">
         <div>
-          <h1 className="text-3xl mb-2">{groupData.name}</h1>
+          <h1 className="text-3xl mb-2">
+            {groupData.name}
+            {groupData.privacy === 'private' && groupData.invitationCode && (
+              <span className="text-muted-foreground text-2xl ml-2 font-mono">
+                (CODE: {groupData.invitationCode})
+              </span>
+            )}
+          </h1>
           <p className="text-muted-foreground">{groupData.description}</p>
+          {groupData.privacy === 'private' && groupData.invitationCode && (
+            <div className="mt-4 p-4 bg-muted/50 rounded-lg border border-border max-w-md">
+              <div className="flex items-center gap-2 mb-2">
+                <Lock className="h-4 w-4 text-primary" />
+                <span className="font-semibold text-sm">Código de Invitación</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <code className="bg-background px-3 py-1 rounded border font-mono text-lg tracking-wider">
+                  {groupData.invitationCode}
+                </code>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    navigator.clipboard.writeText(groupData.invitationCode || '');
+                    toast.success('Código copiado al portapapeles');
+                  }}
+                >
+                  Copiar
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground mt-2">
+                Comparte este código con las personas que quieras invitar al grupo.
+              </p>
+            </div>
+          )}
         </div>
         <div className="flex space-x-2">
           <Button variant="outline" onClick={() => downloadReport('pdf')}>
@@ -357,8 +394,8 @@ export function GroupDashboard() {
                   {canWithdrawInvestment() ? 'Disponible' : `${timeLeft.days}d ${timeLeft.hours}h`}
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  {canWithdrawInvestment() ? 
-                    'Inversión lista para retiro' : 
+                  {canWithdrawInvestment() ?
+                    'Inversión lista para retiro' :
                     'Hasta poder retirar inversión'}
                 </p>
                 {canWithdrawInvestment() && (
@@ -410,7 +447,7 @@ export function GroupDashboard() {
                   <Lock className="h-4 w-4 text-yellow-600" />
                 )}
               </div>
-              
+
               {groupData.type === 'investment' && !canWithdrawInvestment() && groupData.investmentTerm && (
                 <Alert className="mb-3 border-yellow-200 bg-yellow-50">
                   <Clock className="h-4 w-4" />
@@ -422,15 +459,15 @@ export function GroupDashboard() {
 
               <AlertDialog>
                 <AlertDialogTrigger asChild>
-                  <Button 
-                    variant="outline" 
+                  <Button
+                    variant="outline"
                     className="w-full"
                     disabled={groupData.type === 'investment' && !canWithdrawInvestment()}
                     onClick={() => handleWithdraw('savings')}
                   >
                     <LogOut className="mr-2 h-4 w-4" />
-                    {groupData.type === 'investment' && !canWithdrawInvestment() ? 'Bloqueado hasta fecha límite' : 
-                     groupData.type === 'savings' ? 'Retirar Ahorros' : 'Retirar Inversión'}
+                    {groupData.type === 'investment' && !canWithdrawInvestment() ? 'Bloqueado hasta fecha límite' :
+                      groupData.type === 'savings' ? 'Retirar Ahorros' : 'Retirar Inversión'}
                   </Button>
                 </AlertDialogTrigger>
               </AlertDialog>
@@ -448,7 +485,7 @@ export function GroupDashboard() {
                   </div>
                   <Unlock className="h-4 w-4 text-green-600" />
                 </div>
-                
+
                 <Alert className="mb-3 border-green-200 bg-green-50">
                   <TrendingUp className="h-4 w-4" />
                   <AlertDescription className="text-sm">
@@ -458,8 +495,8 @@ export function GroupDashboard() {
 
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
-                    <Button 
-                      variant="outline" 
+                    <Button
+                      variant="outline"
                       className="w-full"
                       onClick={() => handleWithdraw('profits')}
                       disabled={groupData.userProfits <= 0}
@@ -480,17 +517,17 @@ export function GroupDashboard() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
-              Confirmar {withdrawType === 'savings' ? 
-                (groupData.type === 'savings' ? 'Retiro de Ahorros' : 'Retiro de Inversión') : 
+              Confirmar {withdrawType === 'savings' ?
+                (groupData.type === 'savings' ? 'Retiro de Ahorros' : 'Retiro de Inversión') :
                 'Retiro de Ganancias'}
             </AlertDialogTitle>
             <AlertDialogDescription>
               {withdrawType === 'savings' ? (
                 <>
-                  ¿Estás seguro de que quieres retirar tu {groupData.type === 'savings' ? 'ahorro' : 'inversión'} 
+                  ¿Estás seguro de que quieres retirar tu {groupData.type === 'savings' ? 'ahorro' : 'inversión'}
                   de <strong>${groupData.userContribution.toLocaleString()}</strong>?
                   <br /><br />
-                  <strong>Importante:</strong> {groupData.type === 'savings' ? 
+                  <strong>Importante:</strong> {groupData.type === 'savings' ?
                     'Al retirar tus ahorros, saldrás del grupo y no podrás volver a unirte.' :
                     'Al retirar tu inversión, saldrás del grupo de inversión y perderás cualquier beneficio futuro.'}
                 </>
@@ -700,8 +737,8 @@ export function GroupDashboard() {
                       <p className="text-sm text-muted-foreground">
                         {groupData.activeVoting.votesFor} a favor, {groupData.activeVoting.votesAgainst} en contra
                       </p>
-                      <Progress 
-                        value={(groupData.activeVoting.votesFor / groupData.activeVoting.totalMembers) * 100} 
+                      <Progress
+                        value={(groupData.activeVoting.votesFor / groupData.activeVoting.totalMembers) * 100}
                         className="mt-2"
                       />
                     </div>
@@ -762,28 +799,28 @@ export function GroupDashboard() {
 
                 {/* Suggestions */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-4">
-                  <button 
+                  <button
                     onClick={() => { setAiQuestion('¿Cómo va el progreso del grupo?'); }}
                     className="p-3 text-left text-sm border rounded-lg hover:bg-accent transition-colors"
                   >
                     <p className="font-medium">💰 Progreso del Grupo</p>
                     <p className="text-xs text-muted-foreground">Ver cómo va el avance general</p>
                   </button>
-                  <button 
+                  <button
                     onClick={() => { setAiQuestion('¿Quién está atrasado en los pagos?'); }}
                     className="p-3 text-left text-sm border rounded-lg hover:bg-accent transition-colors"
                   >
                     <p className="font-medium">⏰ Estado de Miembros</p>
                     <p className="text-xs text-muted-foreground">Ver quién necesita pagar</p>
                   </button>
-                  <button 
+                  <button
                     onClick={() => { setAiQuestion('¿Cuánto ha aportado cada miembro?'); }}
                     className="p-3 text-left text-sm border rounded-lg hover:bg-accent transition-colors"
                   >
                     <p className="font-medium">📊 Aportes por Miembro</p>
                     <p className="text-xs text-muted-foreground">Ver contribuciones individuales</p>
                   </button>
-                  <button 
+                  <button
                     onClick={() => { setAiQuestion('¿Cuándo alcanzaremos la meta?'); }}
                     className="p-3 text-left text-sm border rounded-lg hover:bg-accent transition-colors"
                   >

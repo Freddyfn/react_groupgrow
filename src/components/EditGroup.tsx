@@ -94,15 +94,23 @@ export function EditGroup() {
       try {
         setIsLoading(true);
         const groupData = await groupService.getGroupById(parseInt(groupId));
-        
+
         // Verificar que el usuario es el creador
-        if (groupData.creatorId !== user.id) {
-          setError('No tienes permisos para editar este grupo');
+        console.log('🔍 EDIT CHECK - groupData.creatorId:', groupData.creatorId, 'type:', typeof groupData.creatorId);
+        console.log('🔍 EDIT CHECK - user.id:', user.id, 'type:', typeof user.id);
+        console.log('🔍 EDIT CHECK - Number(groupData.creatorId):', Number(groupData.creatorId));
+        console.log('🔍 EDIT CHECK - Number(user.id):', Number(user.id));
+        console.log('🔍 EDIT CHECK - Son iguales?:', Number(groupData.creatorId) === Number(user.id));
+
+        if (Number(groupData.creatorId) !== Number(user.id)) {
+          console.log('❌ ACCESO DENEGADO');
+          setError(`DEBUGGING - CreatorID: ${groupData.creatorId} vs UserID: ${user.id}`);
           setIsLoading(false);
           toast.error('Solo el creador puede editar este grupo');
-          setTimeout(() => navigate('/my-groups'), 2000);
+          // setTimeout(() => navigate('/my-groups'), 2000); // Comentado para que puedas ver el error
           return;
         }
+        console.log('✅ ACCESO PERMITIDO');
 
         // Convertir a MyGroup
         const foundGroup: MyGroup = {
@@ -128,7 +136,7 @@ export function EditGroup() {
         };
 
         setGroup(foundGroup);
-        
+
         // Cargar datos en el formulario
         setFormData({
           groupName: foundGroup.name,
@@ -172,7 +180,7 @@ export function EditGroup() {
     }
 
     // Verificar permisos nuevamente
-    if (group.creatorId !== user.id) {
+    if (Number(group.creatorId) !== Number(user.id)) {
       setError('No tienes permisos para editar este grupo');
       toast.error('Solo el creador puede editar este grupo');
       return;
@@ -273,15 +281,15 @@ export function EditGroup() {
     <div className="min-h-screen py-8 px-4 sm:px-6 lg:px-8">
       <div className="max-w-2xl mx-auto">
         <div className="mb-6">
-          <Button 
-            variant="ghost" 
+          <Button
+            variant="ghost"
             onClick={() => navigate('/my-groups')}
             className="mb-4"
           >
             <ArrowLeft className="mr-2 h-4 w-4" />
             Volver a Mis Grupos
           </Button>
-          
+
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -292,7 +300,7 @@ export function EditGroup() {
                 Modifica la configuración y objetivos de tu grupo
               </CardDescription>
             </CardHeader>
-            
+
             <CardContent>
               <form onSubmit={handleSubmit} className="space-y-6">
                 {error && (
@@ -304,7 +312,7 @@ export function EditGroup() {
                 {/* Información Básica */}
                 <div className="space-y-4">
                   <h3 className="text-lg">Información Básica</h3>
-                  
+
                   <div>
                     <Label htmlFor="groupName">Nombre del Grupo *</Label>
                     <Input
@@ -317,8 +325,8 @@ export function EditGroup() {
 
                   <div>
                     <Label>Tipo de Grupo *</Label>
-                    <RadioGroup 
-                      value={formData.groupType} 
+                    <RadioGroup
+                      value={formData.groupType}
                       onValueChange={(value) => handleInputChange('groupType', value)}
                       className="flex space-x-6 mt-2"
                     >
@@ -346,7 +354,7 @@ export function EditGroup() {
 
                   <div>
                     <Label htmlFor="category">Categoría</Label>
-                    <Select 
+                    <Select
                       value={formData.category}
                       onValueChange={(value) => handleInputChange('category', value)}
                     >
@@ -370,7 +378,7 @@ export function EditGroup() {
                     <Target className="h-5 w-5" />
                     Objetivos Financieros
                   </h3>
-                  
+
                   <div>
                     <Label htmlFor="goal">Meta Específica *</Label>
                     <Input
@@ -424,7 +432,7 @@ export function EditGroup() {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <Label htmlFor="contributionFrequency">Frecuencia de Aportes</Label>
-                      <Select 
+                      <Select
                         value={formData.contributionFrequency}
                         onValueChange={(value) => handleInputChange('contributionFrequency', value)}
                       >
@@ -455,8 +463,8 @@ export function EditGroup() {
                   {formData.groupType === 'investment' && (
                     <div>
                       <Label>Nivel de Riesgo</Label>
-                      <RadioGroup 
-                        value={formData.riskLevel} 
+                      <RadioGroup
+                        value={formData.riskLevel}
                         onValueChange={(value) => handleInputChange('riskLevel', value)}
                         className="flex space-x-6 mt-2"
                       >
@@ -483,7 +491,7 @@ export function EditGroup() {
                     <Users className="h-5 w-5" />
                     Configuración del Grupo
                   </h3>
-                  
+
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <Label htmlFor="maxMembers">Número Máximo de Miembros</Label>
@@ -500,8 +508,8 @@ export function EditGroup() {
 
                     <div>
                       <Label>Privacidad</Label>
-                      <RadioGroup 
-                        value={formData.privacy} 
+                      <RadioGroup
+                        value={formData.privacy}
                         onValueChange={(value) => handleInputChange('privacy', value)}
                         className="flex space-x-6 mt-2"
                       >
@@ -535,9 +543,9 @@ export function EditGroup() {
                     <Save className="mr-2 h-4 w-4" />
                     Guardar Cambios
                   </Button>
-                  <Button 
-                    type="button" 
-                    variant="outline" 
+                  <Button
+                    type="button"
+                    variant="outline"
                     onClick={() => navigate('/my-groups')}
                     className="flex-1"
                   >

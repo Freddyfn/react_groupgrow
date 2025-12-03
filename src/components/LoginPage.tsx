@@ -61,7 +61,7 @@ export function LoginPage() {
         // Extraemos datos básicos del usuario (esto debería venir del backend o token)
         const userName = email.split('@')[0]; // Simulación, obtén el nombre real
         // Llama a la función login del AuthContext para guardar el token y usuario
-        login(token, { id: userId, email: email, name: userName });
+        login(token, { id: userId, email: email, name: userName }, remember);
         toast.success('¡Inicio de sesión exitoso!'); // Muestra notificación
         navigate('/dashboard'); // Redirige al dashboard
       } else {
@@ -74,9 +74,9 @@ export function LoginPage() {
       if (err.response && err.response.data && typeof err.response.data === 'string') {
         setError(err.response.data); // Muestra mensaje de error del backend si existe
       } else if (err.response && err.response.data && err.response.data.status === 'FAILURE') {
-         setError('Credenciales inválidas. Inténtalo de nuevo.'); // Mensaje específico para FAILURE
+        setError('Credenciales inválidas. Inténtalo de nuevo.'); // Mensaje específico para FAILURE
       }
-       else {
+      else {
         setError('Error al conectar con el servidor. Revisa tu conexión.');
       }
     }
@@ -95,8 +95,8 @@ export function LoginPage() {
       return;
     }
     if (twoFACode.length !== 6) {
-        setError('El código debe tener 6 dígitos.');
-        return;
+      setError('El código debe tener 6 dígitos.');
+      return;
     }
 
     try {
@@ -113,13 +113,13 @@ export function LoginPage() {
         // 5. ¡Verificación 2FA exitosa!
         const userName = email.split('@')[0]; // Simulación
         // Llama a la función login del AuthContext
-        login(token, { id: userId, email: email, name: userName });
+        login(token, { id: userId, email: email, name: userName }, remember);
         toast.success('¡Inicio de sesión exitoso!');
         navigate('/dashboard');
       } else {
-         // Aunque el backend debería devolver error 400, por si acaso
-         setError('Código 2FA incorrecto.');
-         setTwoFACode(''); // Limpia el campo
+        // Aunque el backend debería devolver error 400, por si acaso
+        setError('Código 2FA incorrecto.');
+        setTwoFACode(''); // Limpia el campo
       }
     } catch (err: any) {
       // Error en la llamada API (probablemente 400 Bad Request por código incorrecto)
@@ -170,8 +170,8 @@ export function LoginPage() {
                   maxLength={6}
                   value={twoFACode}
                   onChange={(value) => setTwoFACode(value)}
-                  // Estilos para centrarlo y hacerlo más grande si quieres
-                  // containerClassName="justify-center"
+                // Estilos para centrarlo y hacerlo más grande si quieres
+                // containerClassName="justify-center"
                 >
                   <InputOTPGroup>
                     <InputOTPSlot index={0} />
